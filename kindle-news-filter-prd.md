@@ -126,9 +126,11 @@ Log failures locally as well.
 4. Build one edition manually and read it on the actual device before automating anything
 5. Schedule the afternoon run
 
-## 8. Open questions
+## 8. Open questions — resolved
 
-- Which specific AI feeds to use
-- Whether summaries should be written in Spanish or English, particularly for the Chile section
-- Whether to include images, given the size limit and the fact that Kindle rendering is greyscale
-- Which model to use for ranking, and whether ranking and summarising should be one call or two
+- **AI feeds**: OpenAI, TechCrunch AI, The Verge AI, VentureBeat AI, plus HN frontpage filtered by keyword. Anthropic has no public RSS feed (verified) and isn't included, but AI-relevant Anthropic news still surfaces via the press outlets and HN when it's significant.
+- **Language**: World and AI summaries in English, Chile in Spanish.
+- **Images**: none, permanently — not just for v1.
+- **Model / call structure**: one combined rank + summarize call per category, via the Anthropic API (`claude-opus-5`). Implemented in `src/rank.py`.
+
+Also resolved during implementation, not originally flagged: **Emol's RSS has been discontinued** — every documented URL pattern now redirects to their plain HTML page. Dropped from the Chile source list; Cooperativa, BioBioChile, and La Tercera cover it (La Tercera's feed, flagged in the PRD as unverified, works fine at `/rss`).

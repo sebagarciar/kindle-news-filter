@@ -4,8 +4,26 @@ A local script that builds a daily EPUB news digest — nine ranked headlines
 (world, AI, Chile) plus queued read-later articles from Telegram — and emails
 it straight to a Kindle. Full spec in [`kindle-news-filter-prd.md`](kindle-news-filter-prd.md).
 
-Status: scaffolding only. No ranking, fetching, or delivery logic yet — see
-`src/` for stubs mapped to each PRD section.
+## Status
+
+All modules are implemented, and everything that doesn't need a secret has
+been tested against live sources: RSS ingestion (real feeds, verified this
+session — see PRD section 8 for what changed), clustering, article
+extraction and its fallback chain, and EPUB assembly all produce real
+output today. A test edition built from live World headlines was sent and
+opened successfully.
+
+Not yet run end-to-end, because they need credentials this session doesn't
+have:
+- **Ranking** (`src/rank.py`) — calls the Anthropic API. Code follows the
+  documented SDK usage but has never made a real call.
+- **Telegram inbox** (`src/telegram_bot.py`) — needs a BotFather token.
+  Message routing logic is unit-tested; the live poll/reply round-trip isn't.
+- **Delivery** (`src/deliver.py`) — needs SMTP credentials and the sending
+  address on Amazon's approved sender list.
+
+Next step: fill in `.env`, then run `python src/main.py` once manually and
+read the result on the actual Kindle (PRD section 7, setup checklist).
 
 ## Setup
 
