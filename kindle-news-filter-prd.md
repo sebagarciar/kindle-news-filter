@@ -131,6 +131,6 @@ Log failures locally as well.
 - **AI feeds**: OpenAI, TechCrunch AI, The Verge AI, VentureBeat AI, plus HN frontpage filtered by keyword. Anthropic has no public RSS feed (verified) and isn't included, but AI-relevant Anthropic news still surfaces via the press outlets and HN when it's significant.
 - **Language**: World and AI summaries in English, Chile in Spanish.
 - **Images**: none, permanently — not just for v1.
-- **Model / call structure**: one combined rank + summarize call per category, via the Anthropic API (`claude-opus-5`). Implemented in `src/rank.py`.
+- **Model / call structure**: one combined rank + summarize call per category. Runs against a local model via Ollama (default `llama3.1:8b`, configurable) rather than a cloud API — no key, nothing leaves the laptop, in keeping with the "no server, no hosting" non-goal read literally. Implemented in `src/rank.py`; live-tested on both the clustered path (World) and the flat-list path (Chile, Spanish output).
 
 Also resolved during implementation, not originally flagged: **Emol's RSS has been discontinued** — every documented URL pattern now redirects to their plain HTML page. Dropped from the Chile source list; Cooperativa, BioBioChile, and La Tercera cover it (La Tercera's feed, flagged in the PRD as unverified, works fine at `/rss`).

@@ -1,4 +1,4 @@
-"""Final selection via the model. PRD 5.2, 5.3.
+"""Final selection via a local model. PRD 5.2, 5.3.
 
 For World and AI, input is pre-ranked clusters (cluster.py) — one candidate
 per cluster (the most recent) is passed through, tagged with how many
@@ -12,19 +12,26 @@ model raw; matched candidates carry their prior summary so the model can
 decide to skip (nothing new) or reframe as an update (PRD 5.3 prefers
 reframing developing stories over flat suppression).
 
-Decided in conversation (PRD 8 open questions): one combined rank+summarize
-call, not two. World and AI summaries in English, Chile in Spanish.
+Runs against a local Ollama server (no API key, nothing leaves the laptop —
+decided in conversation after the PRD's "no server, no hosting" non-goal
+turned out to mean this literally). Also decided: one combined
+rank+summarize call, not two. World and AI summaries in English, Chile in
+Spanish.
 """
 
 from __future__ import annotations
 
 import json
+import os
 
-import anthropic
+import requests
 
 import backlog as backlog_module
 
-MODEL = "claude-opus-5"
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
+REQUEST_TIMEOUT = 180  # local inference on a laptop CPU/GPU can be slow
+
 ITEMS_PER_CATEGORY = 3
 
 _LANGUAGE_NAME = {"en": "English", "es": "Spanish"}
@@ -77,28 +84,29 @@ news (not "here is an article about...").
 Candidates:
 {json.dumps(candidates, ensure_ascii=False, indent=2)}
 
-Respond with ONLY a JSON array, no other text, no markdown fences. Each \
-element: {{"title": <original candidate title>, "url": <original candidate \
-url>, "summary": <your summary>, "is_update": <true if this reframes a \
-previously_sent item, else false>}}. Return at most {ITEMS_PER_CATEGORY} \
-elements, fewer only if fewer candidates genuinely deserve a place."""
+Respond with ONLY a JSON object, no other text: {{"items": [...]}} where \
+each element of "items" is {{"title": <original candidate title>, "url": \
+<original candidate url>, "summary": <your summary>, "is_update": <true if \
+this reframes a previously_sent item, else false>}}. At most \
+{ITEMS_PER_CATEGORY} elements, fewer only if fewer candidates genuinely \
+deserve a place."""
 
 
 def _call_model(prompt: str) -> list[dict]:
-    client = anthropic.Anthropic()
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=4096,
-        thinking={"type": "adaptive"},
-        output_config={"effort": "medium"},
-        messages=[{"role": "user", "content": prompt}],
+    response = requests.post(
+        f"{OLLAMA_HOST}/api/generate",
+        json={
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "format": "json",
+            "stream": False,
+        },
+        timeout=REQUEST_TIMEOUT,
     )
-    text = next((b.text for b in response.content if b.type == "text"), "")
-    text = text.strip()
-    if text.startswith("```"):
-        text = text.split("```")[1]
-        text = text.removeprefix("json").strip()
-    return json.loads(text)
+    response.raise_for_status()
+    raw = response.json()["response"]
+    parsed = json.loads(raw)
+    return parsed["items"]
 
 
 def select_top_three(
