@@ -1,0 +1,7 @@
+# One topic per line. Hard filter applied deterministically before ranking (PRD 5.7).
+# Never left to the model's judgement.
+#
+# Examples:
+# gossip
+# sport
+# royals

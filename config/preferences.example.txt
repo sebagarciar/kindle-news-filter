@@ -1,0 +1,7 @@
+# One instruction per line. Pasted directly into the ranking prompt (PRD 5.7).
+# Editable here, or by sending "prefer ..." to the Telegram bot.
+#
+# Examples:
+# less football
+# more Chilean economy
+# more AI infrastructure, less product launches

@@ -1,0 +1,14 @@
+# secrets
+.env
+
+# runtime state — personal data, not code
+state/*
+!state/.gitkeep
+
+# python
+.venv/
+__pycache__/
+*.pyc
+
+# os
+.DS_Store
