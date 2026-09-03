@@ -161,6 +161,12 @@ def run() -> None:
         _log(f"FATAL: EPUB build failed: {e}")
         raise
 
+    output_dir = state_dir.parent / "output"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_path = output_dir / f"edition-{edition_date}.epub"
+    output_path.write_bytes(epub_bytes)
+    _log(f"Saved local copy: {output_path}")
+
     try:
         deliver.send_edition(epub_bytes, edition_date)
         _log(f"Sent edition for {edition_date} ({len(epub_bytes)} bytes). Status: {status_line}")

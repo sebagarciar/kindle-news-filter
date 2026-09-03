@@ -5,6 +5,9 @@
 state/*
 !state/.gitkeep
 
+# built editions — generated output, not code
+output/
+
 # python
 .venv/
 __pycache__/
