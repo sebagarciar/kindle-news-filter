@@ -49,7 +49,7 @@ A message to the Telegram bot starting with "prefer" tunes the ranking
 prompt (e.g. "less football"); any other message with a link queues it as
 a read-later item, capped at 5 per edition with the rest rolling over.
 
-## Status (as of 2026-09-03)
+## Status (as of 2026-09-04)
 
 Every stage has run against live data, not test fixtures: real RSS feeds,
 real cross-source clustering on the day's actual headlines, real ranking
@@ -59,7 +59,7 @@ sends, each one landing on the actual Kindle. One of those runs also
 drained a real Telegram message into the read-later queue and delivered
 it in the same edition.
 
-Three issues surfaced only because of that live testing, not code review:
+Four issues surfaced only because of that live testing, not code review:
 
 - **A dependency I trusted was wrong.** The PRD assumed Emol's RSS feed
   worked. It's been discontinued; every documented URL now redirects to
@@ -74,6 +74,25 @@ Three issues surfaced only because of that live testing, not code review:
   back to a bare "read the original" link the reader still couldn't open
   (NYT itself blocks it). Swapped NYT for NPR World, whose RSS and article
   pages both extract cleanly.
+
+- **A feed that only answers a browser.** VentureBeat's AI feed failed on
+  every run: it sits behind bot protection that returns HTTP 429 and an
+  HTML challenge page to a plain feed reader. It does respond to a spoofed
+  desktop-browser User-Agent, which would have been the quick fix and the
+  wrong one, since it makes the digest depend on staying undetected.
+  Swapped for Ars Technica's AI section, feed and extraction both verified.
+
+- **The ranking prompt was summarising from titles alone.** Two of three
+  Chile summaries shipped blank on 2026-09-04. The model was writing them,
+  and the redundancy guard in `epub_builder.py` was correctly deleting
+  them, because they only reworded the headline. The cause was upstream:
+  `rank.py` passed the model a title, URL and source but dropped the RSS
+  excerpt, so on local Chilean stories it has no background knowledge of,
+  rewording was the only thing left to do. The excerpt is now part of the
+  prompt, and a summary that still comes back redundant falls back to the
+  excerpt's own opening sentence rather than to nothing. Excerpt handling
+  is block-aware for that reason: flattening an RSS fragment to one line
+  splices the newsletter sign-up box into the middle of the summary.
 
 Not yet done: the daily cron job isn't scheduled (still run manually), and
 the 7-day repeat-detection logic hasn't been observed across an actual

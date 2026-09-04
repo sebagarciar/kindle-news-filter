@@ -4,11 +4,18 @@ Pulls candidate headlines per category via feedparser. RSS feeds are
 reverse-chronological only — no popularity signal here, that comes later
 from cross-source clustering in cluster.py.
 
-Every feed URL below was curl-verified live before being added. Two PRD
+Every feed URL below was curl-verified live before being added. Three PRD
 assumptions turned out to be wrong and are noted rather than silently
 "fixed": Emol's RSS has been discontinued (every documented pattern
 redirects to their plain HTML page), and Anthropic has no public RSS feed.
 Both are dropped in favour of sources that actually return XML today.
+
+VentureBeat AI is the third. It now sits behind Vercel bot protection and
+answers a plain feed reader with HTTP 429 and an HTML challenge page, so
+it failed on every live run. It only responds to a spoofed desktop-browser
+User-Agent, which is a dependency on staying undetected rather than a
+working feed, so it was dropped for Ars Technica's AI section — same call
+as swapping NYT for NPR World, and for the same reason.
 """
 
 from __future__ import annotations
@@ -43,7 +50,7 @@ AI_FEEDS: list[tuple[str, str]] = [
     ("OpenAI", "https://openai.com/news/rss.xml"),
     ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
     ("The Verge AI", "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml"),
-    ("VentureBeat AI", "https://venturebeat.com/category/ai/feed/"),
+    ("Ars Technica AI", "https://arstechnica.com/ai/feed/"),
 ]
 
 # Hacker News has no topic-filtered RSS, so the frontpage feed is pulled
