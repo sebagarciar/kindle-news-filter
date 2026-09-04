@@ -17,7 +17,7 @@ headlines, chosen for importance, not recency. Full spec in
 ## How it works
 
 1. **Ingest**: pull recent headlines from 4 World feeds (BBC, Guardian,
-   NYT, Al Jazeera), 5 AI sources (OpenAI, TechCrunch, The Verge,
+   NPR, Al Jazeera), 5 AI sources (OpenAI, TechCrunch, The Verge,
    VentureBeat, Hacker News filtered by keyword), and 3 Chile feeds
    (Cooperativa, BioBioChile, La Tercera). Capped per feed to keep any one
    high-frequency source from crowding out the rest, about 30-40 candidates
@@ -34,7 +34,11 @@ headlines, chosen for importance, not recency. Full spec in
    case it's reframed as an update.
 4. **Fetch full text**: extract clean article text for each selected
    headline. If extraction fails or the source is paywalled, fall back to
-   the RSS excerpt, then to a marked "full text unavailable" link.
+   the RSS excerpt, then to a marked "full text unavailable" link. A
+   read-later item that's a YouTube link has no article text to extract,
+   so it gets its transcript pulled and summarized by the same local model
+   instead — same no-cloud rule, same graceful fallback to a "watch it
+   here" link if the video has no transcript.
 5. **Build the EPUB**: a landing page listing the 9 headlines, each linking
    to a summary page, which links to the full article, which links back.
    Read-later items from Telegram get a second landing page, so a phone
@@ -55,7 +59,7 @@ sends, each one landing on the actual Kindle. One of those runs also
 drained a real Telegram message into the read-later queue and delivered
 it in the same edition.
 
-Two bugs surfaced only because of that live testing, not code review:
+Three issues surfaced only because of that live testing, not code review:
 
 - **A dependency I trusted was wrong.** The PRD assumed Emol's RSS feed
   worked. It's been discontinued; every documented URL now redirects to
@@ -65,6 +69,11 @@ Two bugs surfaced only because of that live testing, not code review:
   `queue.py` shadowed Python's own `queue` module, which
   `trafilatura`'s dependencies import internally. The import failed with
   an unrelated-looking error three layers deep. Renamed to `read_later.py`.
+- **NYT consistently blocked article extraction.** Every real edition
+  hit a 403 fetching the selected NYT story, so that headline always fell
+  back to a bare "read the original" link the reader still couldn't open
+  (NYT itself blocks it). Swapped NYT for NPR World, whose RSS and article
+  pages both extract cleanly.
 
 Not yet done: the daily cron job isn't scheduled (still run manually), and
 the 7-day repeat-detection logic hasn't been observed across an actual

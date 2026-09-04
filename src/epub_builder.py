@@ -5,7 +5,9 @@ work on a Kindle screen. Replaced with a tap-through structure:
 
   Main landing (9 titles, grouped World/AI/Chile, no summaries — just
   titles, so it fits one small screen)
-    -> tap a title -> TL;DR page (title + summary + "Full article ->")
+    -> tap a title -> TL;DR page (title + summary + "Full article ->",
+       summary omitted when it's just the title reworded — see
+       _is_redundant_summary)
       -> tap that -> full article page
     -> TL;DR page and full article page each have "<- Back" to the landing
        they came from
@@ -25,6 +27,7 @@ from __future__ import annotations
 
 import html
 import os
+import re
 import tempfile
 
 from ebooklib import epub
@@ -47,16 +50,61 @@ def _esc(text: str) -> str:
     return html.escape(text or "")
 
 
+# Redundant-summary detection: the model (rank.py) is told not to just
+# restate the title, but a local 8B model sometimes does it anyway. Rather
+# than trust that instruction alone, catch the leftover cases here so the
+# reader never has to read the same sentence twice in a row. Word overlap,
+# not similarity scoring — this stays dependency-free and works for both
+# English and Spanish sections.
+REDUNDANCY_THRESHOLD = 0.5
+
+_STOPWORDS = {
+    "a", "an", "the", "of", "in", "on", "at", "to", "for", "and", "or",
+    "is", "are", "was", "were", "be", "as", "by", "with", "from", "after",
+    "over", "into", "amid", "its", "his", "her", "their", "says", "said",
+    "has", "have", "had", "it", "this", "that", "than", "but", "not",
+    "de", "la", "el", "los", "las", "un", "una", "unos", "unas", "en",
+    "y", "o", "que", "con", "para", "por", "su", "sus", "del", "al",
+    "ha", "han", "es", "son", "se", "lo", "más", "como", "entre", "sin",
+}
+_WORD_RE = re.compile(r"[a-zA-ZÀ-ÿ0-9]+")
+_SUFFIXES = ("mente", "iendo", "ando", "ing", "es", "ed", "s")
+
+
+def _stem(word: str) -> str:
+    for suffix in _SUFFIXES:
+        if word.endswith(suffix) and len(word) - len(suffix) >= 3:
+            return word[: -len(suffix)]
+    return word
+
+
+def _content_tokens(text: str) -> list[str]:
+    words = _WORD_RE.findall((text or "").lower())
+    return [_stem(w) for w in words if w not in _STOPWORDS and len(w) > 2]
+
+
+def _is_redundant_summary(title: str, summary: str) -> bool:
+    """True if the summary is mostly just the title's words rearranged."""
+    summary_tokens = _content_tokens(summary)
+    title_tokens = set(_content_tokens(title))
+    if len(summary_tokens) < 4 or not title_tokens:
+        return False
+    overlap = sum(1 for t in summary_tokens if t in title_tokens)
+    return (overlap / len(summary_tokens)) >= REDUNDANCY_THRESHOLD
+
+
 def _slug(section_name: str, i: int) -> str:
     return f"{section_name.lower().replace(' ', '_')}_{i}"
 
 
 def _tldr_html(item: dict, landing_href: str, full_href: str) -> str:
     source_line = f"<p><em>{_esc(item.get('source', ''))}</em></p>" if item.get("source") else ""
+    summary = item.get("summary", "")
+    summary_line = "" if _is_redundant_summary(item["title"], summary) else f"<p>{_esc(summary)}</p>"
     return (
         f"<h2>{_esc(item['title'])}</h2>"
         f"{source_line}"
-        f"<p>{_esc(item.get('summary', ''))}</p>"
+        f"{summary_line}"
         f'<p><a href="{full_href}">Full article {FORWARD_ARROW}</a></p>'
         f"<hr/>"
         f'<p><a href="{landing_href}">{BACK_ARROW} Back</a></p>'

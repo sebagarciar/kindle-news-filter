@@ -22,15 +22,9 @@ Spanish.
 from __future__ import annotations
 
 import json
-import os
-
-import requests
 
 import backlog as backlog_module
-
-OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1:8b")
-REQUEST_TIMEOUT = 180  # local inference on a laptop CPU/GPU can be slow
+import llm
 
 ITEMS_PER_CATEGORY = 3
 
@@ -79,7 +73,10 @@ must be framed as an update — state what's changed since the prior summary, \
 don't repeat it.
 
 Write every summary in {lang_name}, 1-2 sentences, dense with the actual \
-news (not "here is an article about...").
+news (not "here is an article about..."). The reader already sees the \
+title before the summary, so the summary must add something the title \
+doesn't already say — a number, a name, a cause, or a consequence. Don't \
+just restate the title in different words.
 
 Candidates:
 {json.dumps(candidates, ensure_ascii=False, indent=2)}
@@ -93,18 +90,7 @@ deserve a place."""
 
 
 def _call_model(prompt: str) -> list[dict]:
-    response = requests.post(
-        f"{OLLAMA_HOST}/api/generate",
-        json={
-            "model": OLLAMA_MODEL,
-            "prompt": prompt,
-            "format": "json",
-            "stream": False,
-        },
-        timeout=REQUEST_TIMEOUT,
-    )
-    response.raise_for_status()
-    raw = response.json()["response"]
+    raw = llm.generate(prompt, json_mode=True)
     parsed = json.loads(raw)
     return parsed["items"]
 

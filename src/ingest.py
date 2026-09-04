@@ -35,7 +35,7 @@ MAX_PER_FEED = 10
 WORLD_FEEDS: list[tuple[str, str]] = [
     ("BBC World", "https://feeds.bbci.co.uk/news/world/rss.xml"),
     ("The Guardian World", "https://www.theguardian.com/world/rss"),
-    ("NYT World", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
+    ("NPR World", "https://feeds.npr.org/1004/rss.xml"),
     ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
 ]
 

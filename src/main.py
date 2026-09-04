@@ -8,7 +8,9 @@ Run once in the afternoon (Madrid time), manually or via cron/launchd:
   4. Cluster + rank World/AI (cluster.py), rank Chile directly (rank.py),
      checking each against the backlog (backlog.py, inside rank.py)
   5. Pull up to 5 read-later items (read_later.py)
-  6. Fetch and embed full text for everything selected (fetch.py)
+  6. Fetch and embed full text for everything selected (fetch.py); a
+     read-later item that's a YouTube link gets its transcript summarized
+     instead (youtube.py) — there's no article text to extract from a video
   7. Build the EPUB (epub_builder.py)
   8. Send it (deliver.py)
   9. Record what was sent (backlog.py)
@@ -37,6 +39,7 @@ import preferences
 import read_later
 import rank
 import telegram_bot
+import youtube
 
 # How many pre-ranked clusters get handed to the model per category — the
 # model does the final selection of 3, this just bounds the prompt size.
@@ -91,15 +94,23 @@ def _embed_read_later(queued: list[dict], failures: list[str]) -> list[dict]:
     items = []
     for entry in queued:
         title = entry["text"][:80] or entry["url"] or "(untitled)"
-        if entry["url"]:
+        text = entry["text"]
+        summary = entry["text"][:200]
+        if entry["url"] and youtube.is_youtube_url(entry["url"]):
+            try:
+                result = youtube.fetch_video_summary(entry["url"], entry["text"])
+                title = result["title"] or title
+                text = result["text"]
+                summary = text[:200]
+            except Exception as e:
+                failures.append(f"Read Later: video summary failed for '{title}' ({e})")
+        elif entry["url"]:
             try:
                 result = fetch.fetch_article_text(entry["url"], entry["text"])
+                text = result["text"]
             except Exception as e:
                 failures.append(f"Read Later: fetch failed for '{title}' ({e})")
-                result = {"text": entry["text"], "truncated": False, "full_text_available": False}
-        else:
-            result = {"text": entry["text"], "truncated": False, "full_text_available": False}
-        items.append({"title": title, "url": entry["url"], "summary": entry["text"][:200], "text": result["text"]})
+        items.append({"title": title, "url": entry["url"], "summary": summary, "text": text})
     return items
 
 
