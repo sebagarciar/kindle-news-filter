@@ -54,12 +54,11 @@ a read-later item, capped at 5 per edition with the rest rolling over.
 Every stage has run against live data, not test fixtures: real RSS feeds,
 real cross-source clustering on the day's actual headlines, real ranking
 and summarizing through the local model, real article extraction
-including its paywall and dead-link fallbacks, and 3 real end-to-end
-sends, each one landing on the actual Kindle. One of those runs also
-drained a real Telegram message into the read-later queue and delivered
-it in the same edition.
+including its paywall and dead-link fallbacks, and end-to-end sends that
+landed on the actual Kindle. A real Telegram message has been drained
+into the read-later queue and delivered in the same edition.
 
-Four issues surfaced only because of that live testing, not code review:
+Five issues surfaced only because of that live testing, not code review:
 
 - **A dependency I trusted was wrong.** The PRD assumed Emol's RSS feed
   worked. It's been discontinued; every documented URL now redirects to
@@ -74,14 +73,12 @@ Four issues surfaced only because of that live testing, not code review:
   back to a bare "read the original" link the reader still couldn't open
   (NYT itself blocks it). Swapped NYT for NPR World, whose RSS and article
   pages both extract cleanly.
-
-- **A feed that only answers a browser.** VentureBeat's AI feed failed on
-  every run: it sits behind bot protection that returns HTTP 429 and an
+- **A feed that only answers a browser.** VentureBeat's AI feed kept
+  failing: it sits behind bot protection that returns HTTP 429 and an
   HTML challenge page to a plain feed reader. It does respond to a spoofed
   desktop-browser User-Agent, which would have been the quick fix and the
   wrong one, since it makes the digest depend on staying undetected.
   Swapped for Ars Technica's AI section, feed and extraction both verified.
-
 - **The ranking prompt was summarising from titles alone.** Two of three
   Chile summaries shipped blank on 2026-09-04. The model was writing them,
   and the redundancy guard in `epub_builder.py` was correctly deleting
@@ -94,9 +91,12 @@ Four issues surfaced only because of that live testing, not code review:
   is block-aware for that reason: flattening an RSS fragment to one line
   splices the newsletter sign-up box into the middle of the summary.
 
-Not yet done: the daily cron job isn't scheduled (still run manually), and
-the 7-day repeat-detection logic hasn't been observed across an actual
-multi-day run.
+Repeat detection has now been watched doing its job: a story that went out
+in one edition was still sitting live in the feed for the next one and was
+correctly held back, rather than going out twice.
+
+Not yet done: the daily cron job isn't scheduled, so this is still started
+by hand.
 
 ## Stack
 
