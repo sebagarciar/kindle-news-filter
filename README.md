@@ -36,20 +36,26 @@ headlines, chosen for importance, not recency. Full spec in
    headline. If extraction fails or the source is paywalled, fall back to
    the RSS excerpt, then to a marked "full text unavailable" link. A
    read-later item that's a YouTube link has no article text to extract,
-   so it gets its transcript pulled and summarized by the same local model
-   instead — same no-cloud rule, same graceful fallback to a "watch it
-   here" link if the video has no transcript.
-5. **Build the EPUB**: a landing page listing the 9 headlines, each linking
-   to a summary page, which links to the full article, which links back.
-   Read-later items from Telegram get a second landing page, so a phone
-   link-dump never buries the day's actual news.
+   so it gets its transcript pulled and turned into reading notes by the
+   same local model instead — same no-cloud rule, same graceful fallback to
+   a "watch it here" link if the video has no transcript. A transcript
+   longer than the model can hold at once is read in chunks and the notes
+   merged, so they cover the end of a talk and not just its first ten
+   minutes.
+5. **Build the EPUB**: one landing page with four sections — World, AI,
+   Chile, Read Later — each a heading with its headlines underneath. Tap a
+   title for a TL;DR page, tap that for the full article; each links back
+   to its own section on the landing page, not the top of it. Every
+   headline is also its own chapter in the EPUB's table of contents, so a
+   Kindle's "time left in chapter" shows reading time per headline instead
+   of for the whole edition.
 6. **Deliver**: email the EPUB to the Kindle's send-to-Kindle address.
 
 A message to the Telegram bot starting with "prefer" tunes the ranking
 prompt (e.g. "less football"); any other message with a link queues it as
 a read-later item, capped at 5 per edition with the rest rolling over.
 
-## Status (as of 2026-09-04)
+## Status (as of 2026-09-05)
 
 Every stage has run against live data, not test fixtures: real RSS feeds,
 real cross-source clustering on the day's actual headlines, real ranking
@@ -58,7 +64,7 @@ including its paywall and dead-link fallbacks, and end-to-end sends that
 landed on the actual Kindle. A real Telegram message has been drained
 into the read-later queue and delivered in the same edition.
 
-Five issues surfaced only because of that live testing, not code review:
+Seven issues surfaced only because of that live testing, not code review:
 
 - **A dependency I trusted was wrong.** The PRD assumed Emol's RSS feed
   worked. It's been discontinued; every documented URL now redirects to
@@ -91,9 +97,43 @@ Five issues surfaced only because of that live testing, not code review:
   is block-aware for that reason: flattening an RSS fragment to one line
   splices the newsletter sign-up box into the middle of the summary.
 
+- **The read-later queue emptied before the edition existed.** A queued
+  YouTube video shipped in the first edition of 2026-09-04 and was missing
+  from the two re-runs that followed that evening, including the copy saved
+  to `output/`. Picking items for an edition deleted them on the spot,
+  before the EPUB was built or sent, so a re-run — or any crash between
+  picking and sending — lost them with nothing left on disk to rebuild
+  from. Items are now stamped as delivered only after the send succeeds,
+  and a re-run on the same date rebuilds the identical section. Nothing
+  failed and nothing was logged; the item simply wasn't there, which is why
+  it took reading the run log against the queue's timestamps to find.
+- **Summaries too short to learn anything from.** The first version of the
+  video path asked for 3-5 sentences over the first 12,000 characters of
+  transcript, which is a blurb about the first third of a talk. A video
+  gets queued because it's worth an hour of attention, so the notes now run
+  500-900 words across the whole transcript, and the prompt asks for the
+  teachable substance by name (methods, rules of thumb, mistakes,
+  recommendations) while forbidding it where the video doesn't offer it. A
+  related trap sat underneath: Ollama's default context window is a few
+  thousand tokens and it truncates a longer prompt silently, so half a
+  transcript can go missing with no error anywhere. Long-context calls now
+  set `num_ctx` explicitly.
+
 Repeat detection has now been watched doing its job: a story that went out
 in one edition was still sitting live in the feed for the next one and was
 correctly held back, rather than going out twice.
+
+Reading real editions on the device surfaced four navigation/content
+complaints, fixed on 2026-09-05: the separate Read Later page got folded
+into the main landing as a fourth section; "Back" links now jump to an
+item's own section instead of the top of the landing page; extracted
+article text now gets a boilerplate pass (comment counters, "click here to
+subscribe", related-reading blocks) that `trafilatura` sometimes leaves
+behind; and the ranking prompt can now leave a summary blank when the title
+already says everything, instead of rewording it. Each headline is also
+now its own chapter, so a Kindle's time-left-in-chapter reflects one
+headline instead of the whole edition. Verified by rebuilding a real
+edition and checking its markup directly — not yet re-read on the device.
 
 Not yet done: the daily cron job isn't scheduled, so this is still started
 by hand.
@@ -118,6 +158,11 @@ LLM inference).
 ```bash
 python src/main.py
 ```
+
+A queued YouTube link adds real time to the run: roughly five minutes of
+local inference for a 40-minute video, since the transcript is read in
+chunks and then merged. Five queued videos is the worst case the
+per-edition cap allows, and that run takes most of half an hour.
 
 Intended to run once daily via cron/launchd, afternoon Madrid time (see PRD section 4).
 

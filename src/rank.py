@@ -103,7 +103,10 @@ title before the summary, so the summary must add something the title \
 doesn't already say — a number, a name, a cause, or a consequence, taken \
 from the excerpt. Don't just restate the title in different words: a \
 summary that only rearranges the headline's own words is worse than no \
-summary and will be thrown away.
+summary and will be thrown away. If the title already states the whole \
+newsworthy fact and the excerpt has nothing to add beyond it, return "" \
+for summary rather than padding it out — a title that's self-explanatory \
+doesn't need one.
 
 Candidates:
 {json.dumps(candidates, ensure_ascii=False, indent=2)}
@@ -142,7 +145,13 @@ def _apply_summary_fallback(selected: list[dict], candidates: list[dict]) -> lis
 
     for item in selected:
         summary = (item.get("summary") or "").strip()
-        if summary and not text_utils.is_redundant_summary(item.get("title", ""), summary):
+        if not summary:
+            # The model was told it may leave this blank when the title
+            # already says everything — honour that rather than backfilling
+            # an excerpt sentence it deliberately decided not to write.
+            item["summary"] = ""
+            continue
+        if not text_utils.is_redundant_summary(item.get("title", ""), summary):
             continue
         excerpt = excerpts.get(item.get("url", "")) or excerpts.get(item.get("title", ""), "")
         if excerpt and not text_utils.is_redundant_summary(item.get("title", ""), excerpt):

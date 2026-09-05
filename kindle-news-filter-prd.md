@@ -83,7 +83,9 @@ That third case is the path for X posts. The post text cannot be pulled reliably
 
 FIFO, capped at 5 items per edition, oldest first. The remainder rolls over to the next day. This prevents a Sunday link-dump from producing an unreadable Monday brick, while making sure nothing gets lost.
 
-Read-later items are fetched and embedded exactly like news items, using the same fallback chain.
+An edition picking up an item does not remove it from the queue. Each item is stamped with the date of the edition that delivered it, and the stamp is written only once the send has succeeded, so a failed send or a second run on the same day rebuilds the same Read Later section rather than an empty one. Delivered items are pruned after 7 days.
+
+Read-later items are fetched and embedded exactly like news items, using the same fallback chain, with one exception: a YouTube link has no article text to extract. Its transcript is pulled and summarized locally into 500-900 words of reading notes covering the whole video, read in chunks and merged when the transcript is longer than the model's context window. The notes are asked for the teachable substance explicitly (methods, rules of thumb, mistakes to avoid, recommendations), and for it to be left out where the video does not offer it.
 
 ### 5.7 Preferences and exclusions
 
@@ -113,7 +115,7 @@ Log failures locally as well.
 | File | Purpose |
 |---|---|
 | `backlog.json` | Last 7 days of sent items with fingerprints and summaries |
-| `queue.json` | Pending read-later items |
+| `queue.json` | Read-later items, pending and recently delivered |
 | `preferences.txt` | Steering instructions for the ranking prompt |
 | `exclusions.txt` | Hard topic filters |
 | `last_update_id` | Telegram polling offset |

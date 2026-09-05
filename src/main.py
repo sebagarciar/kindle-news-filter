@@ -7,7 +7,8 @@ Run once in the afternoon (Madrid time), manually or via cron/launchd:
   3. Apply exclusions (preferences.py)
   4. Cluster + rank World/AI (cluster.py), rank Chile directly (rank.py),
      checking each against the backlog (backlog.py, inside rank.py)
-  5. Pull up to 5 read-later items (read_later.py)
+  5. Pull up to 5 read-later items (read_later.py) — read-only; they are
+     stamped as delivered after the send, never before
   6. Fetch and embed full text for everything selected (fetch.py); a
      read-later item that's a YouTube link gets its transcript summarized
      instead (youtube.py) — there's no article text to extract from a video
@@ -39,11 +40,15 @@ import preferences
 import read_later
 import rank
 import telegram_bot
+import text_utils
 import youtube
 
 # How many pre-ranked clusters get handed to the model per category — the
 # model does the final selection of 3, this just bounds the prompt size.
 CLUSTERS_TO_MODEL = 15
+
+# Length of the TL;DR shown in front of a read-later item's full text.
+READ_LATER_TLDR_CHARS = 300
 
 
 def _log(message: str) -> None:
@@ -95,19 +100,22 @@ def _embed_read_later(queued: list[dict], failures: list[str]) -> list[dict]:
     for entry in queued:
         title = entry["text"][:80] or entry["url"] or "(untitled)"
         text = entry["text"]
-        summary = entry["text"][:200]
+        summary = entry["text"][:READ_LATER_TLDR_CHARS]
         if entry["url"] and youtube.is_youtube_url(entry["url"]):
             try:
                 result = youtube.fetch_video_summary(entry["url"], entry["text"])
                 title = result["title"] or title
                 text = result["text"]
-                summary = text[:200]
+                summary = result["summary"]
             except Exception as e:
                 failures.append(f"Read Later: video summary failed for '{title}' ({e})")
         elif entry["url"]:
             try:
                 result = fetch.fetch_article_text(entry["url"], entry["text"])
                 text = result["text"]
+                # Whole sentences off the top of the article, rather than a cut
+                # at character 200 that lands mid-word on the TL;DR page.
+                summary = text_utils.lead_sentences(text, READ_LATER_TLDR_CHARS) or summary
             except Exception as e:
                 failures.append(f"Read Later: fetch failed for '{title}' ({e})")
         items.append({"title": title, "url": entry["url"], "summary": summary, "text": text})
@@ -154,7 +162,7 @@ def run() -> None:
     ai_selected = _rank_clustered_category("AI", ai_candidates, "en", failures)
     chile_selected = _rank_flat_category("Chile", chile_candidates, "es", failures)
 
-    read_later_queued = read_later.pop_for_edition()
+    read_later_queued = read_later.take_for_edition(edition_date)
 
     sections = {
         "World": _embed(world_selected, failures, "World"),
@@ -184,6 +192,11 @@ def run() -> None:
     except Exception as e:
         _log(f"FATAL: delivery failed: {e}")
         raise
+
+    # Only now that the edition is actually out: a queued item stays queued
+    # until it has been delivered, so a failed send or a same-day re-run
+    # rebuilds the same Read Later section instead of an empty one.
+    read_later.mark_delivered(read_later_queued, edition_date)
 
     # Updates get recorded too, so the next repeat check sees the latest summary.
     for entry in world_selected + ai_selected + chile_selected:

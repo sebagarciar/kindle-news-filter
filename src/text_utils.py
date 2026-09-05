@@ -40,9 +40,15 @@ _BLOCK_END_RE = re.compile(r"</(?:p|div|li|ul|ol|h[1-6]|blockquote|tr)>|<br\s*/?
 
 # Blocks that are site furniture, not news, in either digest language.
 _CHROME_RE = re.compile(
-    r"^(?:sign up|subscribe|continue reading|read more|follow us|share this|"
-    r"download|get the|newsletter|advertisement|photograph|suscr[ií]bete|"
-    r"sigue leyendo|lee m[aá]s|m[aá]s informaci[oó]n|comparte)\b",
+    r"^(?:sign up|subscribe|continue reading|read more|read next|follow us|"
+    r"share this|share on|download|get the|newsletter|advertisement|"
+    r"photograph|suscr[ií]bete|sigue leyendo|lee m[aá]s|lee tambi[eé]n|"
+    r"te puede interesar|m[aá]s informaci[oó]n|comparte(?:\s+esta)?|"
+    r"s[ií]guenos|comentarios?|comments?|leave a (?:reply|comment)|"
+    r"join the conversation|view comments|deja tu comentario|click here|"
+    r"haz clic aqu[ií]|related(?:\s+(?:articles?|stories|reading))?|"
+    r"recommended for you|you might also like|"
+    r"\d+\s*(?:comments?|comentarios?))\b",
     re.I,
 )
 
@@ -86,6 +92,18 @@ def text_blocks(text: str) -> list[str]:
 def clean_text(text: str) -> str:
     """Chrome-free plain text — what the model should see."""
     return " ".join(text_blocks(text))
+
+
+def strip_boilerplate(text: str) -> str:
+    """Drop paragraphs that are site furniture rather than article text —
+    comment counters, "click here to subscribe", share prompts, related-
+    reading blocks. Unlike text_blocks/clean_text, this works on trafilatura's
+    plain-text output (blank-line-separated paragraphs, no HTML), which is
+    what fetch.py embeds in the EPUB. Same _CHROME_RE, since it's the same
+    junk in either shape."""
+    blocks = [b.strip() for b in (text or "").split("\n\n")]
+    kept = [b for b in blocks if b and not _CHROME_RE.match(b)]
+    return "\n\n".join(kept)
 
 
 def lead_sentences(text: str, limit: int) -> str:

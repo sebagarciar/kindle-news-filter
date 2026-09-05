@@ -1,21 +1,31 @@
-"""EPUB assembly. PRD 5.8, revised per feedback after the first test edition.
+"""EPUB assembly. PRD 5.8, revised twice after live testing.
 
-Original design (flat TOC, full text inline under each headline) didn't
-work on a Kindle screen. Replaced with a tap-through structure:
+Tap-through structure:
 
-  Main landing (9 titles, grouped World/AI/Chile, no summaries — just
-  titles, so it fits one small screen)
+  Main landing (World / AI / Chile / Read Later, each a heading with its
+    headlines underneath — titles only, no summaries, so it fits one small
+    screen)
     -> tap a title -> TL;DR page (title + summary + "Full article ->",
-       summary omitted when it's just the title reworded — see
-       text_utils.is_redundant_summary)
+       summary omitted when it's redundant with the title — see
+       text_utils.is_redundant_summary, and rank.py can now also just leave
+       it blank itself when the title already says everything)
       -> tap that -> full article page
-    -> TL;DR page and full article page each have "<- Back" to the landing
-       they came from
+    -> TL;DR page and full article page each have "<- Back", which jumps to
+       that item's own section heading on the landing page (an in-page
+       anchor), not to the top of the landing — so reading a Chile item and
+       tapping Back lands you back among the Chile headlines, not scrolled
+       past them to World.
 
-Read Later items get their own second landing page rather than being mixed
-into the main 9, for the same small-screen reason — their "Back" links
-return to the Read Later landing, not the main one, so the two flows never
-cross.
+Read Later used to get its own second landing page. Folded into the main
+one as a fourth section (same shape as World/AI/Chile) after feedback that
+a separate page for it was more navigation, not less.
+
+Every headline is also registered as its own chapter in the EPUB's nav/NCX
+(nested under its section), pointing at that item's TL;DR page. That's what
+turns on a Kindle's "time left in chapter" estimate per headline — the
+chapter runs from the TL;DR page through the full article, ending where the
+next headline's TL;DR page begins, so the estimate covers exactly the
+"how long is this one" question, not the whole edition.
 
 Still owns the total-size check against Amazon's send-to-Kindle email limit
 (PRD 5.4, 5.10) — if the assembled book is still too big after fetch.py's
@@ -37,11 +47,10 @@ import text_utils
 # under it leaves room for MIME/base64 overhead in deliver.py.
 MAX_EPUB_BYTES = 40 * 1024 * 1024
 
-NEWS_SECTIONS = ["World", "AI", "Chile"]
-LANG_BY_SECTION = {"World": "en", "AI": "en", "Chile": "es"}
+SECTIONS = ["World", "AI", "Chile", "Read Later"]
+LANG_BY_SECTION = {"World": "en", "AI": "en", "Chile": "es", "Read Later": "en"}
 
 LANDING_FILE = "index.xhtml"
-READ_LATER_LANDING_FILE = "read_later.xhtml"
 
 BACK_ARROW = "←"
 FORWARD_ARROW = "→"
@@ -55,10 +64,15 @@ def _slug(section_name: str, i: int) -> str:
     return f"{section_name.lower().replace(' ', '_')}_{i}"
 
 
+def _section_anchor(section_name: str) -> str:
+    return section_name.lower().replace(" ", "_")
+
+
 def _tldr_html(item: dict, landing_href: str, full_href: str) -> str:
     source_line = f"<p><em>{_esc(item.get('source', ''))}</em></p>" if item.get("source") else ""
     summary = item.get("summary", "")
-    summary_line = "" if text_utils.is_redundant_summary(item["title"], summary) else f"<p>{_esc(summary)}</p>"
+    show_summary = bool(summary) and not text_utils.is_redundant_summary(item["title"], summary)
+    summary_line = f"<p>{_esc(summary)}</p>" if show_summary else ""
     return (
         f"<h2>{_esc(item['title'])}</h2>"
         f"{source_line}"
@@ -69,39 +83,46 @@ def _tldr_html(item: dict, landing_href: str, full_href: str) -> str:
     )
 
 
+def _paragraphs_html(text: str) -> str:
+    """Blank-line-separated blocks become real paragraphs, single newlines
+    stay line breaks inside one. Extracted article text and the video notes
+    both arrive with that structure, and a Kindle renders one 500-word <p>
+    as an unbroken wall."""
+    blocks = [block.strip() for block in (text or "").split("\n\n")]
+    return "".join(f"<p>{_esc(block).replace(chr(10), '<br/>')}</p>" for block in blocks if block)
+
+
 def _full_html(item: dict, landing_href: str) -> str:
-    body = _esc(item.get("text", "")).replace("\n", "<br/>")
+    body = _paragraphs_html(item.get("text", ""))
     link_line = f'<p><a href="{_esc(item["url"])}">{_esc(item["url"])}</a></p>' if item.get("url") else ""
     return (
         f"<h2>{_esc(item['title'])}</h2>"
-        f"<p>{body}</p>"
+        f"{body}"
         f"{link_line}"
         f"<hr/>"
         f'<p><a href="{landing_href}">{BACK_ARROW} Back</a></p>'
     )
 
 
-def _landing_html(heading: str, status_line: str | None, groups: list[tuple[str, list[tuple[str, str]]]], footer_html: str) -> str:
+def _landing_html(heading: str, status_line: str | None, groups: list[tuple[str, list[tuple[str, str]]]]) -> str:
     parts = [f"<h1>{_esc(heading)}</h1>"]
     if status_line:
         parts.append(f'<p style="color:#900"><strong>{_esc(status_line)}</strong></p>')
     for section_name, entries in groups:
         if not entries:
             continue
-        if section_name:
-            parts.append(f"<h3>{_esc(section_name)}</h3>")
+        parts.append(f'<h3 id="{_section_anchor(section_name)}">{_esc(section_name)}</h3>')
         parts.append("<ul>")
         for title, href in entries:
             parts.append(f'<li><a href="{href}">{_esc(title)}</a></li>')
         parts.append("</ul>")
-    if footer_html:
-        parts.append(f"<hr/>{footer_html}")
     return "".join(parts)
 
 
-def _add_item_pages(book: epub.EpubBook, section_name: str, items: list[dict], landing_href: str, lang: str) -> tuple[list[tuple[str, str]], list]:
+def _add_item_pages(book: epub.EpubBook, section_name: str, items: list[dict], lang: str) -> tuple[list[tuple[str, str]], list]:
     """Create a TL;DR + full-article chapter pair per item. Returns
     (landing entries as (title, tldr_href), chapters in reading order)."""
+    landing_href = f"{LANDING_FILE}#{_section_anchor(section_name)}"
     entries = []
     chapters = []
     for i, item in enumerate(items):
@@ -126,50 +147,35 @@ def build_epub(edition_date: str, sections: dict[str, list[dict]], status_line: 
 
     sections maps section name -> list of items, each with at least
     'title', 'summary', 'text'; 'source', 'url', 'is_update' are optional.
-    Expected keys: "World", "AI", "Chile" (main landing) and "Read Later"
-    (second landing). status_line, if set, renders at the top of the main
-    landing per PRD 5.10 failure handling.
+    Expected keys: "World", "AI", "Chile", "Read Later", all on one landing
+    page in that order (PRD 5.8). status_line, if set, renders at the top
+    per PRD 5.10 failure handling.
     """
     book = epub.EpubBook()
     book.set_identifier(f"kindle-news-{edition_date}")
     book.set_title(f"News Digest — {edition_date}")
     book.set_language("en")
 
-    read_later_items = sections.get("Read Later", [])
-
-    news_groups = []
-    news_chapters = []
-    for section_name in NEWS_SECTIONS:
-        entries, chapters = _add_item_pages(
-            book, section_name, sections.get(section_name, []), LANDING_FILE, LANG_BY_SECTION[section_name]
-        )
-        news_groups.append((section_name, entries))
-        news_chapters.extend(chapters)
-
-    read_later_landing = None
-    read_later_chapters = []
-    if read_later_items:
-        rl_entries, read_later_chapters = _add_item_pages(book, "Read Later", read_later_items, READ_LATER_LANDING_FILE, "en")
-        rl_footer = f'<p><a href="{LANDING_FILE}">{BACK_ARROW} Main Digest</a></p>'
-        read_later_landing = epub.EpubHtml(title="Read Later", file_name=READ_LATER_LANDING_FILE, lang="en")
-        read_later_landing.content = _landing_html("Read Later", None, [("", rl_entries)], rl_footer)
-        book.add_item(read_later_landing)
-
-    main_footer = f'<p><a href="{READ_LATER_LANDING_FILE}">Read Later {FORWARD_ARROW}</a></p>' if read_later_landing else ""
-    main_landing = epub.EpubHtml(title="News Digest", file_name=LANDING_FILE, lang="en")
-    main_landing.content = _landing_html(f"News Digest — {edition_date}", status_line, news_groups, main_footer)
-    book.add_item(main_landing)
-
-    spine = [main_landing, *news_chapters]
+    groups = []
+    all_chapters = []
     toc = [epub.Link(LANDING_FILE, "News Digest", "landing")]
-    if read_later_landing:
-        spine.extend([read_later_landing, *read_later_chapters])
-        toc.append(epub.Link(READ_LATER_LANDING_FILE, "Read Later", "read_later_landing"))
+    for section_name in SECTIONS:
+        entries, chapters = _add_item_pages(book, section_name, sections.get(section_name, []), LANG_BY_SECTION[section_name])
+        groups.append((section_name, entries))
+        all_chapters.extend(chapters)
+        if entries:
+            anchor = _section_anchor(section_name)
+            section_links = [epub.Link(href, title, f"{anchor}_{i}") for i, (title, href) in enumerate(entries)]
+            toc.append((epub.Section(section_name), section_links))
+
+    main_landing = epub.EpubHtml(title="News Digest", file_name=LANDING_FILE, lang="en")
+    main_landing.content = _landing_html(f"News Digest — {edition_date}", status_line, groups)
+    book.add_item(main_landing)
 
     book.toc = toc
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
-    book.spine = spine + ["nav"]
+    book.spine = [main_landing, *all_chapters, "nav"]
 
     fd, tmp_path = tempfile.mkstemp(suffix=".epub")
     os.close(fd)

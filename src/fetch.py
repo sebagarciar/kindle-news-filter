@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import trafilatura
 
+import text_utils
+
 MIN_SUMMARY_CHARS = 200  # below this, a bare RSS excerpt can't "stand alone"
 TRUNCATE_CHARS = 8000
 
@@ -25,6 +27,12 @@ def fetch_article_text(url: str, fallback_summary: str) -> dict:
         downloaded = trafilatura.fetch_url(url)
         if downloaded:
             text = trafilatura.extract(downloaded)
+            if text:
+                # trafilatura strips most nav/ads but regularly leaves a
+                # trailing "Comments" or "Click here to subscribe" paragraph
+                # behind, since that's article-adjacent text, not markup it
+                # can tell apart structurally.
+                text = text_utils.strip_boilerplate(text)
 
     if text and text.strip():
         truncated = len(text) > TRUNCATE_CHARS
