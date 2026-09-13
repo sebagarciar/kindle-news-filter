@@ -5,8 +5,10 @@ per cluster (the most recent) is passed through, tagged with how many
 sources covered it. For Chile, the full candidate list goes straight in —
 no clustering, the source pool is too small for it to mean anything.
 
-Every category's call takes three inputs: the candidates, the preferences
-file (5.7), and the 7-day backlog (5.3). Backlog matching is done
+Every category's call takes four inputs: the candidates, the preferences
+file (5.7), the exclusions file (5.7, restated here because the keyword
+filter can't see a topic that doesn't name itself — see
+_exclusions_instruction), and the 7-day backlog (5.3). Backlog matching is done
 deterministically in Python (backlog.find_match) rather than handed to the
 model raw; matched candidates carry their prior summary so the model can
 decide to skip (nothing new) or reframe as an update (PRD 5.3 prefers
@@ -70,9 +72,41 @@ def _prepare_candidates(candidates: list[dict], source_counts: dict[str, int] | 
     return prepared
 
 
-def _build_prompt(category: str, candidates: list[dict], preferences: str, language: str) -> str:
+def _exclusions_instruction(exclusions: list[str]) -> str:
+    """The ban list, restated for the model.
+
+    preferences.apply_exclusions has already dropped every candidate that
+    mentions an excluded term literally, and that is the filter that must
+    hold. What it can't do is recognise a topic that never names itself:
+    "no sport" removes a headline containing the word sport and leaves
+    "Real Madrid beats Barcelona" untouched. The model knows that's sport,
+    so it gets told the same ban and covers the semantic half. Keyword
+    filter first because it's deterministic, model second because it
+    generalises — neither alone is enough.
+    """
+    if not exclusions:
+        return ""
+    terms = "\n".join(f"- {term}" for term in exclusions)
+    return f"""
+Banned topics. The reader has excluded these outright. A candidate that is \
+about one of them must never be selected, however important it is, and \
+even when it never uses the word itself — a match result is sport, a \
+wedding in a palace is royals. If that leaves you fewer than \
+{ITEMS_PER_CATEGORY} worthwhile items, return fewer:
+{terms}
+"""
+
+
+def _build_prompt(
+    category: str,
+    candidates: list[dict],
+    preferences: str,
+    language: str,
+    exclusions: list[str],
+) -> str:
     lang_name = _LANGUAGE_NAME[language]
     prefs_block = preferences if preferences else "(none set)"
+    exclusions_block = _exclusions_instruction(exclusions)
     return f"""You are selecting and summarising the "{category}" section of a daily \
 Kindle news digest for one reader. Pick the {ITEMS_PER_CATEGORY} most important items \
 from the candidates below — importance, not recency, and not simply how \
@@ -82,6 +116,7 @@ reflected in source_count).
 Reader's standing preferences (steer selection toward these, they are not \
 optional flavour text):
 {prefs_block}
+{exclusions_block}
 
 Some candidates were already sent in a previous edition within the last 7 \
 days — these carry a "previously_sent" field with the date and summary that \
@@ -167,12 +202,13 @@ def select_top_three(
     category: str,
     language: str = "en",
     source_counts: dict[str, int] | None = None,
+    exclusions: list[str] | None = None,
 ) -> list[dict]:
     """Return up to ITEMS_PER_CATEGORY items for one category, each with a
     1-2 sentence summary in the given language ("en" or "es")."""
     if not candidates:
         return []
     prepared = _prepare_candidates(candidates, source_counts)
-    prompt = _build_prompt(category, prepared, preferences, language)
+    prompt = _build_prompt(category, prepared, preferences, language, exclusions or [])
     selected = _call_model(prompt)[:ITEMS_PER_CATEGORY]
     return _apply_summary_fallback(selected, candidates)

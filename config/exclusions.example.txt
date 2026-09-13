@@ -1,5 +1,11 @@
-# One topic per line. Hard filter applied deterministically before ranking (PRD 5.7).
-# Never left to the model's judgement.
+# One topic per line. Hard filter applied before ranking (PRD 5.7), in two
+# layers: a keyword match on the headline, then a local-model pass that also
+# catches stories about the topic that never name it ("sport" also removes
+# "Real Madrid beats Barcelona"). The model only labels; the dropping is done
+# in Python.
+#
+# Use the shortest form that would appear in a headline: "sport", not
+# "sport news". Plurals are covered already ("sport" matches sports, e-sports).
 #
 # Examples:
 # gossip

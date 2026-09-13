@@ -51,9 +51,21 @@ headlines, chosen for importance, not recency. Full spec in
    of for the whole edition.
 6. **Deliver**: email the EPUB to the Kindle's send-to-Kindle address.
 
-A message to the Telegram bot starting with "prefer" tunes the ranking
-prompt (e.g. "less football"); any other message with a link queues it as
-a read-later item, capped at 5 per edition with the rest rolling over.
+A message to the Telegram bot is routed by the same local model, into one
+of three things: a **ban** ("no sport", "I don't care about the royals"),
+which goes to the hard filter; a **preference** ("more Chilean economy"),
+which tunes the ranking prompt; or something to **read later**, capped at 5
+per edition with the rest rolling over. A leading "no", "never", "exclude",
+"stop" or "prefer" overrides the classifier, and a message carrying a link
+always goes to read-later. Every message gets a reply saying which of the
+three it became, because a misread instruction is only recoverable if it
+says so at the time.
+
+A ban is enforced in two layers, both before ranking: a keyword match on
+the headline, then a second local-model pass that catches stories about the
+topic which never name it — "no sport" has to remove "Real Madrid beats
+Barcelona", and no keyword list gets there. The model only labels which
+headlines are about a banned topic; the dropping is done in Python.
 
 ## Status (as of 2026-09-05)
 

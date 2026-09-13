@@ -4,7 +4,9 @@ Run once in the afternoon (Madrid time), manually or via cron/launchd:
 
   1. Drain the Telegram inbox (telegram_bot.py) -> update preferences/queue
   2. Ingest RSS candidates per category (ingest.py)
-  3. Apply exclusions (preferences.py)
+  3. Apply exclusions (preferences.py) — as a keyword filter here, and
+     again as a ban list inside the ranking prompt (rank.py), which is
+     what catches a banned topic that never names itself
   4. Cluster + rank World/AI (cluster.py), rank Chile directly (rank.py),
      checking each against the backlog (backlog.py, inside rank.py)
   5. Pull up to 5 read-later items (read_later.py) — read-only; they are
@@ -55,7 +57,7 @@ def _log(message: str) -> None:
     logging.info(message)
 
 
-def _rank_clustered_category(category: str, candidates: list[dict], language: str, failures: list[str]) -> list[dict]:
+def _rank_clustered_category(category: str, candidates: list[dict], language: str, failures: list[str], exclusions: list[str]) -> list[dict]:
     if not candidates:
         failures.append(f"{category}: no candidates (all sources failed)")
         return []
@@ -64,21 +66,43 @@ def _rank_clustered_category(category: str, candidates: list[dict], language: st
     reps = [c[0] for c in top_clusters]
     source_counts = {c[0]["title"]: len({item["source"] for item in c}) for c in top_clusters}
     try:
-        return rank.select_top_three(reps, preferences.load_preferences(), category, language, source_counts)
+        return rank.select_top_three(reps, preferences.load_preferences(), category, language, source_counts, exclusions)
     except Exception as e:
         failures.append(f"{category}: ranking failed ({e})")
         return []
 
 
-def _rank_flat_category(category: str, candidates: list[dict], language: str, failures: list[str]) -> list[dict]:
+def _rank_flat_category(category: str, candidates: list[dict], language: str, failures: list[str], exclusions: list[str]) -> list[dict]:
     if not candidates:
         failures.append(f"{category}: no candidates (all sources failed)")
         return []
     try:
-        return rank.select_top_three(candidates, preferences.load_preferences(), category, language)
+        return rank.select_top_three(candidates, preferences.load_preferences(), category, language, None, exclusions)
     except Exception as e:
         failures.append(f"{category}: ranking failed ({e})")
         return []
+
+
+def _exclude(label: str, raw: list[dict], exclusions: list[str], failures: list[str]) -> list[dict]:
+    """Both exclusion layers for one category: keyword filter, then the
+    model-labelled pass for banned topics that never name themselves.
+
+    The semantic pass failing keeps the candidates rather than dropping
+    them, and says so on the status line. A banned story slipping into one
+    edition is a bad edition; a category emptied because Ollama was down is
+    a broken one, and silence is the one unacceptable outcome (PRD 5.10).
+    """
+    candidates = preferences.apply_exclusions(raw, exclusions)
+    if not exclusions:
+        return candidates
+    try:
+        kept = preferences.apply_semantic_exclusions(candidates, exclusions)
+        dropped = len(candidates) - len(kept)
+        _log(f"{label}: exclusions dropped {len(raw) - len(candidates)} by keyword, {dropped} by topic")
+        return kept
+    except Exception as e:
+        failures.append(f"{label}: topic exclusion check failed, keyword filter only ({e})")
+        return candidates
 
 
 def _embed(selected: list[dict], failures: list[str], label: str) -> list[dict]:
@@ -154,13 +178,13 @@ def run() -> None:
         if failed_sources:
             failures.append(f"{label}: {len(failed_sources)} source(s) failed ({', '.join(failed_sources)})")
 
-    world_candidates = preferences.apply_exclusions(world_raw, exclusions)
-    ai_candidates = preferences.apply_exclusions(ai_raw, exclusions)
-    chile_candidates = preferences.apply_exclusions(chile_raw, exclusions)
+    world_candidates = _exclude("World", world_raw, exclusions, failures)
+    ai_candidates = _exclude("AI", ai_raw, exclusions, failures)
+    chile_candidates = _exclude("Chile", chile_raw, exclusions, failures)
 
-    world_selected = _rank_clustered_category("World", world_candidates, "en", failures)
-    ai_selected = _rank_clustered_category("AI", ai_candidates, "en", failures)
-    chile_selected = _rank_flat_category("Chile", chile_candidates, "es", failures)
+    world_selected = _rank_clustered_category("World", world_candidates, "en", failures, exclusions)
+    ai_selected = _rank_clustered_category("AI", ai_candidates, "en", failures, exclusions)
+    chile_selected = _rank_flat_category("Chile", chile_candidates, "es", failures, exclusions)
 
     read_later_queued = read_later.take_for_edition(edition_date)
 
