@@ -18,7 +18,15 @@ import smtplib
 from email.message import EmailMessage
 
 
-def send_edition(epub_bytes: bytes, edition_date: str) -> None:
+def send_edition(
+    epub_bytes: bytes,
+    edition_date: str,
+    subject: str | None = None,
+    filename: str | None = None,
+) -> None:
+    """Email one edition. subject and filename default to the daily digest's
+    naming; a one-off edition passes its own so it arrives distinguishable
+    from the dailies rather than as another "News Digest"."""
     smtp_host = os.environ["SMTP_HOST"]
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_user = os.environ["SMTP_USER"]
@@ -29,13 +37,14 @@ def send_edition(epub_bytes: bytes, edition_date: str) -> None:
     message = EmailMessage()
     message["From"] = sender
     message["To"] = kindle_email
-    message["Subject"] = f"News Digest {edition_date}"
-    message.set_content(f"News digest for {edition_date}. See attached EPUB.")
+    subject = subject or f"News Digest {edition_date}"
+    message["Subject"] = subject
+    message.set_content(f"{subject}. See attached EPUB.")
     message.add_attachment(
         epub_bytes,
         maintype="application",
         subtype="epub+zip",
-        filename=f"news-digest-{edition_date}.epub",
+        filename=filename or f"news-digest-{edition_date}.epub",
     )
 
     with smtplib.SMTP(smtp_host, smtp_port) as server:

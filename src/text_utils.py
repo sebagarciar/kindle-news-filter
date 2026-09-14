@@ -54,6 +54,11 @@ _CHROME_RE = re.compile(
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
+# A finished sentence, at the very end of the text.
+_ENDS_SENTENCE_RE = re.compile(r"[.!?\u2026][\"'\u201d\u2019)\]]*\s*$")
+# The last sentence boundary anywhere in the text.
+_LAST_BOUNDARY_RE = re.compile(r"[.!?\u2026][\"'\u201d\u2019)\]]*(?=\s)")
+
 
 def _stem(word: str) -> str:
     for suffix in _SUFFIXES:
@@ -128,3 +133,22 @@ def lead_sentences(text: str, limit: int) -> str:
             break
         out = candidate
     return out[:limit].strip() if len(out) > limit else out
+
+
+def drop_trailing_fragment(text: str) -> str:
+    """Cut a final sentence that was left unfinished.
+
+    A model call that hits its token budget stops mid-word, and that
+    reaches the Kindle page as a dangling clause — one edition's video
+    notes ended on "Having a". Ending a sentence earlier reads as
+    deliberate; ending mid-word reads as broken. Text that already ends on
+    a finished sentence is returned untouched.
+    """
+    stripped = (text or "").strip()
+    if not stripped or _ENDS_SENTENCE_RE.search(stripped):
+        return stripped
+
+    last = None
+    for match in _LAST_BOUNDARY_RE.finditer(stripped):
+        last = match
+    return stripped[:last.end()].rstrip() if last else stripped

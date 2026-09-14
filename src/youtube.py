@@ -189,7 +189,8 @@ def _tidy(text: str) -> str:
     out = _HEADING_RE.sub("", out)
     out = _BULLET_RE.sub("", out)
     out = out.replace("**", "").replace("__", "")
-    return _BLANKS_RE.sub("\n\n", out).strip()
+    out = _BLANKS_RE.sub("\n\n", out).strip()
+    return text_utils.drop_trailing_fragment(out)
 
 
 def _generate(prompt: str, max_tokens: int) -> str | None:

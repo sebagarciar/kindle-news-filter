@@ -142,18 +142,27 @@ def _add_item_pages(book: epub.EpubBook, section_name: str, items: list[dict], l
     return entries, chapters
 
 
-def build_epub(edition_date: str, sections: dict[str, list[dict]], status_line: str | None) -> bytes:
+def build_epub(
+    edition_date: str,
+    sections: dict[str, list[dict]],
+    status_line: str | None,
+    heading: str | None = None,
+) -> bytes:
     """Assemble the day's edition into EPUB bytes.
 
     sections maps section name -> list of items, each with at least
     'title', 'summary', 'text'; 'source', 'url', 'is_update' are optional.
     Expected keys: "World", "AI", "Chile", "Read Later", all on one landing
     page in that order (PRD 5.8). status_line, if set, renders at the top
-    per PRD 5.10 failure handling.
+    per PRD 5.10 failure handling. heading overrides the book title and
+    landing headline, for an edition that isn't the daily digest — a
+    one-off built from a handful of links, say, which shouldn't sit on the
+    Kindle under the same name as the dailies.
     """
+    heading = heading or f"News Digest — {edition_date}"
     book = epub.EpubBook()
     book.set_identifier(f"kindle-news-{edition_date}")
-    book.set_title(f"News Digest — {edition_date}")
+    book.set_title(heading)
     book.set_language("en")
 
     groups = []
@@ -169,7 +178,7 @@ def build_epub(edition_date: str, sections: dict[str, list[dict]], status_line: 
             toc.append((epub.Section(section_name), section_links))
 
     main_landing = epub.EpubHtml(title="News Digest", file_name=LANDING_FILE, lang="en")
-    main_landing.content = _landing_html(f"News Digest — {edition_date}", status_line, groups)
+    main_landing.content = _landing_html(heading, status_line, groups)
     book.add_item(main_landing)
 
     book.toc = toc
