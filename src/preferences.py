@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import llm
+import text_utils
 
 STATE_DIR = Path(__file__).parent.parent / "state"
 CONFIG_DIR = Path(__file__).parent.parent / "config"
@@ -134,32 +135,73 @@ def apply_exclusions(candidates: list[dict], exclusions: list[str]) -> list[dict
 # truncates a prompt that long rather than erroring (see llm.py). A
 # truncated list looks exactly like a model that decided nothing was
 # banned, which is the one failure mode that must not pass silently.
-_SEMANTIC_CHUNK = 40
-_SEMANTIC_OPTIONS = {"temperature": 0, "num_predict": 300, "num_ctx": 4096}
-_SEMANTIC_TIMEOUT = 90
+# Smaller chunks than the title-only version used, because each entry now
+# carries an excerpt as well.
+_SEMANTIC_CHUNK = 20
+_SEMANTIC_OPTIONS = {"temperature": 0, "num_predict": 400, "num_ctx": 8192}
+_SEMANTIC_TIMEOUT = 120
+
+# Excerpt per candidate. Enough to say what the story is about, short
+# enough that 20 of them still fit the window above.
+_SEMANTIC_EXCERPT_CHARS = 200
 
 
-def _build_semantic_prompt(titles: list[str], exclusions: list[str]) -> str:
+def _build_semantic_prompt(entries: list[dict], exclusions: list[str]) -> str:
     terms = "\n".join(f"- {term}" for term in exclusions)
-    listing = "\n".join(f"{i}. {title}" for i, title in enumerate(titles, start=1))
+    listing = "\n\n".join(
+        f'{i}. {entry["title"]}' + (f'\n   {entry["excerpt"]}' if entry["excerpt"] else "")
+        for i, entry in enumerate(entries, start=1)
+    )
     return f"""The reader of a daily news digest has banned these topics outright:
 {terms}
 
-Below are numbered headlines. Decide, for each, whether it is about any of \
-those banned topics. Judge the subject matter, not the wording: a match \
-result, a transfer, a qualifying session, a league table or a squad \
-announcement is sport even though the word "sport" never appears, and a \
-palace tour or a succession story is royals even though the word "royal" \
-never appears. A headline that merely mentions a banned topic in passing \
-while being about something else — a stadium financing scandal, an \
-election held on a match day — is not about it.
+Below are numbered news items, each a headline and the opening of the \
+article. Some are in Spanish. Decide, for each, whether the item is about \
+any of those banned topics.
 
-Headlines:
+Judge the subject matter, not the wording. A match result, a transfer, a \
+qualifying session, a league table, a rally stage or a squad announcement \
+is sport even though the word "sport" never appears, and a palace tour or \
+a succession story is royals even though the word "royal" never appears.
+
+Being wrong in the other direction costs the reader a story they wanted, \
+so do not flag an item on competitive language alone. "Win", "beat", \
+"race", "title", "champion", "rival" and "lead" are everyday words in \
+business, technology and politics: a company wanting to win a market, a \
+race to ship a product, a party leading a poll and a firm taking the \
+title of largest exporter are not sport. An item that merely mentions a \
+banned topic while being about something else — a stadium financing \
+scandal, an election held on a match day — is not about it either. The \
+excerpt, not the headline's vocabulary, is what settles it.
+
+Items:
 {listing}
 
-Respond with ONLY a JSON object, no other text: {{"banned": [<the numbers \
-of the headlines that are about a banned topic>]}}. Use an empty list if \
-none of them are."""
+Respond with ONLY a JSON object, no other text: \
+{{"banned": [{{"n": <item number>, "topic": "<which banned topic it is \
+about, copied exactly from the list above>"}}]}}. Use an empty list if \
+none of them are about a banned topic."""
+
+
+def _flagged_index(flag: dict, chunk_size: int, exclusions: list[str]) -> int | None:
+    """Validate one flag from the model, or None to ignore it.
+
+    The model has to name which banned topic the item is about, copied from
+    the list it was given. A flag naming a topic that isn't on the list is
+    the model inventing a reason, so it doesn't get to drop a story.
+    """
+    if not isinstance(flag, dict):
+        return None
+    try:
+        index = int(flag.get("n")) - 1
+    except (TypeError, ValueError):
+        return None
+    if not 0 <= index < chunk_size:
+        return None
+    topic = str(flag.get("topic", "")).strip().lower()
+    if topic not in exclusions:
+        return None
+    return index
 
 
 def apply_semantic_exclusions(candidates: list[dict], exclusions: list[str]) -> list[dict]:
@@ -174,21 +216,26 @@ def apply_semantic_exclusions(candidates: list[dict], exclusions: list[str]) -> 
     if not candidates or not exclusions:
         return candidates
 
+    entries = [
+        {
+            "title": c["title"],
+            "excerpt": text_utils.clean_text(c.get("summary", ""))[:_SEMANTIC_EXCERPT_CHARS],
+        }
+        for c in candidates
+    ]
+
     banned_indices = set()
-    for start in range(0, len(candidates), _SEMANTIC_CHUNK):
-        chunk = candidates[start:start + _SEMANTIC_CHUNK]
+    for start in range(0, len(entries), _SEMANTIC_CHUNK):
+        chunk = entries[start:start + _SEMANTIC_CHUNK]
         raw = llm.generate(
-            _build_semantic_prompt([c["title"] for c in chunk], exclusions),
+            _build_semantic_prompt(chunk, exclusions),
             json_mode=True,
             options=_SEMANTIC_OPTIONS,
             timeout=_SEMANTIC_TIMEOUT,
         )
-        for number in json.loads(raw)["banned"]:
-            try:
-                index = int(number) - 1
-            except (TypeError, ValueError):
-                continue  # a stray label in the list shouldn't void the chunk
-            if 0 <= index < len(chunk):
+        for flag in json.loads(raw)["banned"]:
+            index = _flagged_index(flag, len(chunk), exclusions)
+            if index is not None:
                 banned_indices.add(start + index)
 
     return [c for i, c in enumerate(candidates) if i not in banned_indices]
