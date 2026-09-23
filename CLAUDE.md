@@ -13,6 +13,10 @@ brief.
 - `state/` — runtime data, gitignored, seeded from `config/` on first run
 - `output/` — built editions, gitignored
 
+## Repo
+
+Git repo `sebagarciar/kindle-news-filter` on GitHub, **public**. Commit to `main`.
+
 ## Local only, no exceptions
 
 No cloud AI API, no key, ever. Ranking and summarizing run through Ollama, model set by
