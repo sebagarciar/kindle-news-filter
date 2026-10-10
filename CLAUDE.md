@@ -23,10 +23,12 @@ No cloud AI API, no key, ever. Ranking and summarizing run through Ollama, model
 `OLLAMA_MODEL` in `.env`. A first pass used the Anthropic API and was corrected to this , 
 don't reintroduce a cloud call for "better quality" without asking first.
 
-## Not yet scheduled
+## Daily schedule: decided, not built yet
 
-Meant to run daily via cron/launchd, afternoon Madrid time, that's not wired up yet. It's
-still started by hand with `python src/main.py`. Don't assume it runs automatically.
+Seba approved the PRD's plan: run once a day via cron/launchd, afternoon Madrid time. This is
+his decision, so it is the one automation here that does not need asking about first. It is not
+wired up yet and the digest is still started by hand with `python src/main.py`. Don't assume it
+runs automatically.
 
 ## JSON calls use `format: "json"`, not a schema
 
