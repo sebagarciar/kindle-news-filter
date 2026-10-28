@@ -58,8 +58,9 @@ headlines, chosen for importance, not recency. Full spec in
    chapter" shows reading time per story. One small stylesheet does the
    layout and never sets a font or base size, so the Kindle's own settings
    still apply.
-   World and AI stories also get a three-line **Background** box (what
-   happened, how we got here, what to watch), written from the full article.
+   Every story also gets a three-line **Background** box (what
+   happened, how we got here, what to watch), written from the full article,
+   in Spanish ("Contexto") for Chile. A bad or half-empty answer is retried once.
    World stories get two more things. **Go deeper**: one call matches each
    story to a recent explainer from Vox, The Conversation, Foreign Policy,
    Crisis Group or Project Syndicate (last 7 days), which feeds the

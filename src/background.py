@@ -20,15 +20,18 @@ ARTICLE_CHARS = 8000
 # How much of an analysis piece's RSS excerpt the model sees.
 ANALYSIS_EXCERPT_CHARS = 400
 
+_LANGUAGE_NAME = {"en": "English", "es": "Spanish"}
+
 _KEYS = ("what_happened", "how_we_got_here", "what_to_watch")
 
 
-def _build_prompt(item: dict) -> str:
+def _build_prompt(item: dict, language: str) -> str:
     analysis = item.get("analysis")
     analysis_block = (
         f'\nRelated analysis, from {analysis["source"]}: "{analysis["title"]}"\n{analysis["excerpt"]}\n'
         if analysis else ""
     )
+    lang_name = _LANGUAGE_NAME[language]
     return f"""You write a three-line "Background" box for one news story in a daily \
 digest. The reader is smart but not an expert, and wants the global context, \
 not more detail from the article.
@@ -38,7 +41,7 @@ Headline: {item["title"]}
 Article:
 {item["text"][:ARTICLE_CHARS]}
 {analysis_block}
-Write exactly three lines, one plain sentence each, no more than 30 words each:
+Write exactly three lines in {lang_name}, one plain sentence each, no more than 30 words each:
 - what_happened: the single fact that matters, in plain words.
 - how_we_got_here: the earlier events or trend that explain why this is happening now.
 - what_to_watch: the next thing that will show where this is going.
@@ -56,30 +59,32 @@ Respond with ONLY a JSON object, no other text:
 {{"what_happened": "...", "how_we_got_here": "...", "what_to_watch": "..."}}"""
 
 
-def write_background(item: dict) -> dict | None:
+def write_background(item: dict, language: str = "en") -> dict | None:
     """Return {"what_happened", "how_we_got_here", "what_to_watch"} or None
     when the article has no real text to work from."""
     if not item.get("text") or len(item["text"]) < 400:
         return None
-    # One retry: the model now and then returns JSON that does not parse.
+    # One retry: now and then the model returns JSON that does not parse, or
+    # leaves a line empty.
     for attempt in (1, 2):
         try:
-            parsed = json.loads(llm.generate(_build_prompt(item), json_mode=True, heavy=True))
+            parsed = json.loads(llm.generate(_build_prompt(item, language), json_mode=True, heavy=True))
+            block = {key: str(parsed.get(key, "")).strip() for key in _KEYS}
+            if not all(block.values()):
+                raise ValueError("model left a line empty")
             break
-        except json.JSONDecodeError:
+        except ValueError:
             if attempt == 2:
                 raise
-    block = {key: str(parsed.get(key, "")).strip() for key in _KEYS}
-    if not all(block.values()):
-        raise ValueError("model left a line empty")
+    block["lang"] = language
     return block
 
 
-def add_background(items: list[dict], failures: list[str], label: str) -> None:
+def add_background(items: list[dict], failures: list[str], label: str, language: str = "en") -> None:
     """Attach item["background"] to each item in place."""
     for item in items:
         try:
-            block = write_background(item)
+            block = write_background(item, language)
         except Exception as e:
             failures.append(f"{label}: background failed for '{item['title'][:40]}' ({e})")
             continue

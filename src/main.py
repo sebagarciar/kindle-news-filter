@@ -225,6 +225,7 @@ def run(dry_run: bool = False) -> None:
         failures.append(f"Storylines: failed ({e})")
     background.add_background(sections["World"], failures, "World")
     background.add_background(sections["AI"], failures, "AI")
+    background.add_background(sections["Chile"], failures, "Chile", "es")
 
     status_line = "; ".join(failures) if failures else None
     if failures:

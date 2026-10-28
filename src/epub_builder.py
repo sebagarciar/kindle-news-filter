@@ -263,15 +263,22 @@ def _storyline_html(block: dict | None) -> str:
     return f'<div class="background"><p class="bglabel">The story so far: {_esc(block["name"])}</p>{rows}</div>'
 
 
+_BACKGROUND_LABELS = {
+    "en": ("Background", ("What happened.", "How we got here.", "What to watch.")),
+    "es": ("Contexto", ("Qué pasó.", "Cómo llegamos aquí.", "Qué mirar.")),
+}
+
+
 def _background_html(block: dict | None) -> str:
     """The three-line Background box (background.py), or nothing."""
     if not block:
         return ""
+    title, labels = _BACKGROUND_LABELS[block.get("lang", "en")]
     rows = "".join(
         f"<p><b>{label}</b> {_esc(block[key])}</p>"
-        for label, key in (("What happened.", "what_happened"), ("How we got here.", "how_we_got_here"), ("What to watch.", "what_to_watch"))
+        for label, key in zip(labels, ("what_happened", "how_we_got_here", "what_to_watch"))
     )
-    return f'<div class="background"><p class="bglabel">Background</p>{rows}</div>'
+    return f'<div class="background"><p class="bglabel">{title}</p>{rows}</div>'
 
 
 def _story_html(item: dict, story: dict, section_name: str, next_story: tuple[str, str] | None) -> str:
