@@ -211,4 +211,21 @@ def select_top_three(
     prepared = _prepare_candidates(candidates, source_counts)
     prompt = _build_prompt(category, prepared, preferences, language, exclusions or [])
     selected = _call_model(prompt)[:ITEMS_PER_CATEGORY]
-    return _apply_summary_fallback(selected, candidates)
+    return _attach_sources(_apply_summary_fallback(selected, candidates), candidates, source_counts)
+
+
+def _attach_sources(selected: list[dict], candidates: list[dict], source_counts: dict[str, int] | None) -> list[dict]:
+    """Copy each pick's source name, and how many sources covered it, from
+    the candidate it came from. Looked up by URL rather than taken from the
+    model's answer, which was never asked for them. The EPUB shows these
+    under each headline ("BBC World +4")."""
+    by_url = {c["url"]: c for c in candidates}
+    by_title = {c["title"]: c for c in candidates}
+    for item in selected:
+        candidate = by_url.get(item.get("url", "")) or by_title.get(item.get("title", ""))
+        if not candidate:
+            continue
+        item["source"] = candidate["source"]
+        if source_counts is not None:
+            item["source_count"] = source_counts.get(candidate["title"], 1)
+    return selected

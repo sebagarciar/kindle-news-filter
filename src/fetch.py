@@ -31,18 +31,21 @@ def fetch_article_text(url: str, fallback_summary: str) -> dict:
                 # trafilatura strips most nav/ads but regularly leaves a
                 # trailing "Comments" or "Click here to subscribe" paragraph
                 # behind, since that's article-adjacent text, not markup it
-                # can tell apart structurally.
+                # can tell apart structurally. Its output has one paragraph
+                # per line, and strip_boilerplate also turns that into
+                # blank-line-separated paragraphs: left as single lines, a
+                # whole article reached the Kindle as one <p>.
                 text = text_utils.strip_boilerplate(text)
 
     if text and text.strip():
         truncated = len(text) > TRUNCATE_CHARS
         if truncated:
-            text = text[:TRUNCATE_CHARS].rstrip() + "\n\n[Truncated — full article too long for this edition.]"
+            text = text[:TRUNCATE_CHARS].rstrip() + "\n\n[Article cut here: too long for this edition.]"
         return {"text": text, "truncated": truncated, "full_text_available": True}
 
     clean_summary = fallback_summary.strip()
     if len(clean_summary) >= MIN_SUMMARY_CHARS:
         return {"text": clean_summary, "truncated": False, "full_text_available": False}
 
-    note = f"{clean_summary}\n\n[Full text unavailable — read the original: {url}]" if url else clean_summary
+    note = f"{clean_summary}\n\n[Full text unavailable. Read the original at the link below.]" if url else clean_summary
     return {"text": note, "truncated": False, "full_text_available": False}

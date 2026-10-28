@@ -47,8 +47,21 @@ _CHROME_RE = re.compile(
     r"s[ií]guenos|comentarios?|comments?|leave a (?:reply|comment)|"
     r"join the conversation|view comments|deja tu comentario|click here|"
     r"haz clic aqu[ií]|related(?:\s+(?:articles?|stories|reading))?|"
-    r"recommended for you|you might also like|"
+    r"recommended for you|recommended stories|you might also like|"
+    r"-\s*published|-\s*list \d+ of \d+|list of \d+ items|"
+    r"go to [\w.]+\.com|para comentar|algunos leen|plan digital|"
     r"\d+\s*(?:comments?|comentarios?))\b",
+    re.I,
+)
+
+# A block that's only a list number ("1.", "2.") left behind by a
+# "most read" box once its headlines were stripped out.
+_LONE_NUMBER_RE = re.compile(r"^\d+\.?$")
+
+# Headings that open the furniture at the foot of an article: everything
+# from here down is comments, "most read" lists or links to older stories.
+_TAIL_START_RE = re.compile(
+    r"^(?:comentarios|lo m[aá]s le[ií]do|more (?:about|on) .{0,80} from the bbc:?)$",
     re.I,
 )
 
@@ -102,12 +115,19 @@ def clean_text(text: str) -> str:
 def strip_boilerplate(text: str) -> str:
     """Drop paragraphs that are site furniture rather than article text —
     comment counters, "click here to subscribe", share prompts, related-
-    reading blocks. Unlike text_blocks/clean_text, this works on trafilatura's
-    plain-text output (blank-line-separated paragraphs, no HTML), which is
-    what fetch.py embeds in the EPUB. Same _CHROME_RE, since it's the same
-    junk in either shape."""
-    blocks = [b.strip() for b in (text or "").split("\n\n")]
-    kept = [b for b in blocks if b and not _CHROME_RE.match(b)]
+    reading blocks — and cut everything from a footer heading like
+    "COMENTARIOS" down. Works on trafilatura's plain-text output, which puts
+    each paragraph on its own line, and returns blank-line-separated
+    paragraphs, which is what epub_builder.py turns into real <p>s. Same
+    _CHROME_RE as text_blocks/clean_text, since it's the same junk in
+    either shape."""
+    kept = []
+    for line in (text or "").splitlines():
+        block = line.strip()
+        if _TAIL_START_RE.match(block):
+            break
+        if block and not _CHROME_RE.match(block) and not _LONE_NUMBER_RE.match(block):
+            kept.append(block)
     return "\n\n".join(kept)
 
 

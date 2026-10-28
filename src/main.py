@@ -114,8 +114,15 @@ def _embed(selected: list[dict], failures: list[str], label: str) -> list[dict]:
         except Exception as e:
             failures.append(f"{label}: fetch failed for '{entry['title'][:40]}' ({e})")
             result = {"text": entry["summary"], "truncated": False, "full_text_available": False}
-        title = entry["title"] + (" (update)" if entry.get("is_update") else "")
-        items.append({"title": title, "url": entry["url"], "summary": entry["summary"], "text": result["text"]})
+        items.append({
+            "title": entry["title"],
+            "url": entry["url"],
+            "summary": entry["summary"],
+            "text": result["text"],
+            "source": entry.get("source", ""),
+            "source_count": entry.get("source_count", 1),
+            "is_update": bool(entry.get("is_update")),
+        })
     return items
 
 

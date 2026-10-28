@@ -42,13 +42,17 @@ headlines, chosen for importance, not recency. Full spec in
    longer than the model can hold at once is read in chunks and the notes
    merged, so they cover the end of a talk and not just its first ten
    minutes.
-5. **Build the EPUB**: one landing page with four sections — World, AI,
-   Chile, Read Later — each a heading with its headlines underneath. Tap a
-   title for a TL;DR page, tap that for the full article; each links back
-   to its own section on the landing page, not the top of it. Every
-   headline is also its own chapter in the EPUB's table of contents, so a
-   Kindle's "time left in chapter" shows reading time per headline instead
-   of for the whole edition.
+5. **Build the EPUB**: one landing page with four sections (World, AI,
+   Chile, Read Later), each a label with its headlines underneath. Under
+   each headline, one small line: the source, "+N" when other sources
+   covered it too, and minutes to read. Tap a title for the story: the
+   TL;DR in italics on top, then the full article, then "Read on
+   <site>", "Next: <title>" and "Back to <section>", which returns to that
+   section on the landing page, not the top of it. Every story is also its
+   own chapter in the EPUB's table of contents, so a Kindle's "time left in
+   chapter" shows reading time per story. One small stylesheet does the
+   layout and never sets a font or base size, so the Kindle's own settings
+   still apply.
 6. **Deliver**: email the EPUB to the Kindle's send-to-Kindle address.
 
 A message to the Telegram bot is routed by the same local model, into one
@@ -146,6 +150,21 @@ already says everything, instead of rewording it. Each headline is also
 now its own chapter, so a Kindle's time-left-in-chapter reflects one
 headline instead of the whole edition. Verified by rebuilding a real
 edition and checking its markup directly — not yet re-read on the device.
+
+A design review on 2026-10-28 found the articles themselves hard to read,
+fixed the same day. `trafilatura` puts one paragraph per line, but the
+builder only split on blank lines, so every article reached the Kindle as
+one paragraph. The boilerplate pass had the same blind spot and was
+checking a whole article as one block, so it caught almost nothing. Both
+now work per paragraph, and the pass also cuts BBC "- Published" lines,
+Al Jazeera "Recommended Stories" lists and La Tercera's comments and
+subscription footer. The headline and TL;DR are no longer repeated at the
+top of the article body. The TL;DR page was merged into the article (one
+slow e-ink refresh less per story), each story ends with a link to the
+next one, the source name finally reaches the page (`rank.py` now copies
+it from the candidate), and the edition got a stylesheet. Verified by
+rebuilding the 2026-10-19 edition from its own text and rendering it next
+to the original; not yet read on the device. No cover image, by choice.
 
 Not yet done: the daily cron job isn't scheduled, so this is still started
 by hand.
