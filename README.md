@@ -166,6 +166,16 @@ it from the candidate), and the edition got a stylesheet. Verified by
 rebuilding the 2026-10-19 edition from its own text and rendering it next
 to the original; not yet read on the device. No cover image, by choice.
 
+Read on the device the same day: a Spanish train crash showed the same
+fact three times, in the headline, the TL;DR and the article's first line.
+The TL;DR is now also checked against the article's opening (first ~40
+words), not only the title, and is left out when more than half of its
+words are already there. On the 19 Oct and 28 Oct editions that hides 8
+of 18 TL;DRs; every one that stays adds a fact. A TL;DR copied word for
+word from the article stays in the body if it's hidden. Two smaller fixes
+from the same edition: feed titles with HTML codes ("&#8216;") are now
+decoded, and Guardian titles ending "latest updates" get the Live label.
+
 Not yet done: the daily cron job isn't scheduled, so this is still started
 by hand.
 

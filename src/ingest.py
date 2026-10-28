@@ -20,6 +20,7 @@ as swapping NYT for NPR World, and for the same reason.
 
 from __future__ import annotations
 
+import html
 import re
 from calendar import timegm
 from datetime import datetime, timedelta, timezone
@@ -85,7 +86,9 @@ def _published_at(entry) -> datetime | None:
 
 def _normalise(entry, source: str, published_at: datetime | None) -> dict:
     return {
-        "title": entry.get("title", "").strip(),
+        # Some feeds double-encode punctuation, so the parsed title still
+        # reads "&#8216;AI pet journal&#8217;" and reached the Kindle that way.
+        "title": html.unescape(entry.get("title", "")).strip(),
         "url": entry.get("link", ""),
         "source": source,
         "published": published_at.isoformat() if published_at else "",

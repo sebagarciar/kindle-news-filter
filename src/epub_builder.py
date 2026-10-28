@@ -71,13 +71,17 @@ WORDS_PER_MINUTE = 230
 # suffix is noise.
 _SOURCE_SUFFIX_RE = re.compile(r"\s+(?:World|AI)$")
 
-# The Guardian's live blogs end their title in " - live". Shown as a label
+# The Guardian's live blogs end their title in " - live" or " – latest
+# updates". Shown as a label
 # instead, so the headline reads as a headline.
-_LIVE_SUFFIX_RE = re.compile(r"\s+[-–]\s+live$", re.I)
+_LIVE_SUFFIX_RE = re.compile(r"\s+[-–]\s+(?:live|latest updates|live updates)$", re.I)
 
 # Query parameters that only tell the publisher which feed a click came
 # from. Dropped from the printed link; anything else in the query is kept.
 _TRACKING_PARAM_RE = re.compile(r"^(?:utm_|at_)|^(?:traffic_source|ref|cmpid|ns_mchannel|ns_source)$", re.I)
+
+# How much of the article's opening a TL;DR is checked against.
+LEAD_WORDS = 40
 
 # Editorial notes fetch.py adds to the text ("[Article cut here: ...]").
 _NOTE_RE = re.compile(r"^\[.*\]$", re.S)
@@ -187,24 +191,46 @@ def _same_text(a: str, b: str) -> bool:
     return bool(normalise(a)) and normalise(a) == normalise(b)
 
 
-def _body_html(text: str, repeats: list[str]) -> str:
-    """Blank-line-separated blocks become real paragraphs, single newlines
-    stay line breaks inside one (the video notes use those for lists).
+def _body_blocks(text: str, repeats: list[str]) -> list[str]:
+    """The article's paragraphs, minus any that repeat the headline.
 
-    Blocks that repeat the headline or the standfirst are dropped: most
-    sites print both again at the top of the article body, so the reader
-    read the title twice before the story started. So is any block the
-    article itself repeats. repeats holds the headline (as fed and as
-    shown) and the standfirst, if one is shown.
+    Most sites print the headline again at the top of the article body, so
+    the reader read the title twice before the story started. Blocks the
+    article itself repeats are dropped too. repeats holds the headline as
+    fed and as shown.
     """
     seen = [r for r in repeats if r]
-    parts = []
-    first = True
+    blocks = []
     for raw in (text or "").split("\n\n"):
         block = raw.strip()
         if not block or any(_same_text(block, s) for s in seen):
             continue
         seen.append(block)
+        blocks.append(block)
+    return blocks
+
+
+def _lead(blocks: list[str]) -> str:
+    """The opening the reader meets right under the TL;DR: the first
+    paragraph, plus the next ones while it's still under LEAD_WORDS, since
+    a site's one-line subhead isn't the whole opening."""
+    lead, words = [], 0
+    for block in blocks:
+        if _NOTE_RE.match(block):
+            continue
+        lead.append(block)
+        words += len(block.split())
+        if words >= LEAD_WORDS:
+            break
+    return " ".join(lead)
+
+
+def _body_html(blocks: list[str]) -> str:
+    """Blank-line-separated blocks become real paragraphs, single newlines
+    stay line breaks inside one (the video notes use those for lists)."""
+    parts = []
+    first = True
+    for block in blocks:
         content = _esc(block).replace("\n", "<br/>")
         if _NOTE_RE.match(block):
             parts.append(f'<p class="note">{content}</p>')
@@ -216,9 +242,22 @@ def _body_html(text: str, repeats: list[str]) -> str:
 
 def _story_html(item: dict, story: dict, section_name: str, next_story: tuple[str, str] | None) -> str:
     summary = item.get("summary", "")
-    show_summary = bool(summary) and not text_utils.is_redundant_summary(story["title"], summary)
+    blocks = _body_blocks(item.get("text", ""), [item["title"], story["title"]])
+    # A summary copied word for word from the article (the site's own
+    # standfirst, often) moves to the top rather than showing twice, and
+    # isn't counted as part of the opening it's checked against below.
+    without_summary = [b for b in blocks if not _same_text(b, summary)]
+    # The TL;DR is the one part of the page we write ourselves, so it's the
+    # part that goes when the headline and the article's own opening
+    # already say the same thing (2026-10-28: a train crash read as the
+    # same sentence three times in a row).
+    show_summary = (
+        bool(summary)
+        and not text_utils.is_redundant_summary(story["title"], summary)
+        and not text_utils.repeats_opening(summary, story["title"], _lead(without_summary))
+    )
     standfirst = f'<p class="standfirst">{_esc(summary)}</p>' if show_summary else ""
-    body = _body_html(item.get("text", ""), [item["title"], story["title"], summary if show_summary else ""])
+    body = _body_html(without_summary if show_summary else blocks)
 
     links = []
     if item.get("url"):

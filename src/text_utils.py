@@ -95,6 +95,20 @@ def is_redundant_summary(title: str, summary: str) -> bool:
     return (overlap / len(summary_tokens)) >= REDUNDANCY_THRESHOLD
 
 
+def repeats_opening(summary: str, title: str, opening: str) -> bool:
+    """True if more than half of the summary's words are already in the
+    headline or the article's first lines, which sit right around it on
+    the page. Stricter than is_redundant_summary's "at least half": at
+    exactly half, a summary checked on real editions still carried a fact
+    the opening didn't (who, or what happens next)."""
+    summary_tokens = content_tokens(summary)
+    seen = set(content_tokens(f"{title} {opening}"))
+    if len(summary_tokens) < 4 or not seen:
+        return False
+    overlap = sum(1 for t in summary_tokens if t in seen)
+    return overlap / len(summary_tokens) > REDUNDANCY_THRESHOLD
+
+
 def text_blocks(text: str) -> list[str]:
     """Split an HTML fragment into plain-text blocks, dropping site
     furniture (newsletter sign-ups, "Continue reading...") outright."""
