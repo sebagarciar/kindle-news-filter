@@ -28,9 +28,12 @@ headlines, chosen for importance, not recency. Full spec in
    stories covered by more outlets as more important, since RSS carries no
    popularity signal on its own. Chile's source pool is too small for that
    to mean anything, so those headlines go straight to the model instead.
-3. **Select and summarize**: one local model call per category (Qwen 3.5
-   via [Ollama](https://ollama.com), no API key, nothing leaves the
-   laptop) picks the top 3 and writes a 1-2 sentence summary each, in
+3. **Select and summarize**: one model call per category picks the top 3
+   and writes a 1-2 sentence summary each. "Importance" means lasting
+   consequence, not volume, and the 3 World picks are spread across
+   regions. The model is set by `LLM_BACKEND` in `.env`: `claude` runs the
+   `claude -p` tool on Seba's own login (Sonnet, no API key), `ollama` runs
+   Qwen 3.5 locally via [Ollama](https://ollama.com). Summaries are in
    English for World/AI and Spanish for Chile. A 7-day backlog stops the
    same story from repeating unless it has genuinely developed, in which
    case it's reframed as an update.
@@ -55,6 +58,15 @@ headlines, chosen for importance, not recency. Full spec in
    chapter" shows reading time per story. One small stylesheet does the
    layout and never sets a font or base size, so the Kindle's own settings
    still apply.
+   World and AI stories also get a three-line **Background** box (what
+   happened, how we got here, what to watch), written from the full article.
+   World stories get two more things. **Go deeper**: one call matches each
+   story to a recent explainer from Vox, The Conversation, Foreign Policy,
+   Crisis Group or Project Syndicate (last 7 days), which feeds the
+   Background and becomes a link. **The story so far**: stories that run for
+   days (a war, an election) are tracked in `state/storylines.json`; when one
+   returns, its page shows the last 3 dated lines, then today's. Storylines
+   are saved only after a real send, and dropped after 21 days of silence.
 6. **Deliver**: email the EPUB to the Kindle's send-to-Kindle address.
 
 A message to the Telegram bot is routed by the same local model, into one
@@ -204,6 +216,10 @@ LLM inference).
 ```bash
 python src/main.py
 ```
+
+`python src/main.py --dry-run` builds the EPUB into `output/` (as
+`edition-DATE-dryrun.epub`) and does nothing else: no Telegram read, no
+email, no backlog or storyline update.
 
 A queued YouTube link adds real time to the run: roughly five minutes of
 local inference for a 40-minute video, since the transcript is read in

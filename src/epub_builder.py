@@ -109,6 +109,9 @@ h2.section { margin-top: 1.3em; padding-bottom: 0.15em; border-bottom: 1px solid
 h2.sub { margin: 1.2em 0 0.4em 0; font-size: 1.15em; font-weight: bold; line-height: 1.2;
   border-bottom: 1px solid #777; padding-bottom: 0.1em; page-break-after: avoid; }
 h1.headline { margin-bottom: 0.6em; font-size: 1.45em; font-weight: bold; line-height: 1.2; }
+.background { margin-bottom: 1.1em; padding: 0.4em 0.6em; border: 1px solid #000; }
+.bglabel { font-weight: bold; text-transform: uppercase; font-size: 0.8em; margin: 0 0 0.3em 0; }
+.background p { margin: 0 0 0.3em 0; }
 .standfirst { margin-bottom: 1.1em; padding-left: 0.6em; border-left: 2px solid #000; font-style: italic; }
 .body p { text-indent: 1.2em; }
 .body p.first { text-indent: 0; }
@@ -248,6 +251,29 @@ def _body_html(blocks: list[str]) -> str:
     return "".join(parts)
 
 
+def _storyline_html(block: dict | None) -> str:
+    """"The story so far" box (storylines.py): the last few dated lines, then
+    today's. Only present when the story ran in an earlier edition."""
+    if not block:
+        return ""
+    rows = "".join(
+        f"<p><b>{_esc(_short_date(u['date']))}.</b> {_esc(u['text'])}</p>" for u in block["earlier"]
+    )
+    rows += f"<p><b>Today.</b> {_esc(block['today'])}</p>"
+    return f'<div class="background"><p class="bglabel">The story so far: {_esc(block["name"])}</p>{rows}</div>'
+
+
+def _background_html(block: dict | None) -> str:
+    """The three-line Background box (background.py), or nothing."""
+    if not block:
+        return ""
+    rows = "".join(
+        f"<p><b>{label}</b> {_esc(block[key])}</p>"
+        for label, key in (("What happened.", "what_happened"), ("How we got here.", "how_we_got_here"), ("What to watch.", "what_to_watch"))
+    )
+    return f'<div class="background"><p class="bglabel">Background</p>{rows}</div>'
+
+
 def _story_html(item: dict, story: dict, section_name: str, next_story: tuple[str, str] | None) -> str:
     summary = item.get("summary", "")
     blocks = _body_blocks(item.get("text", ""), [item["title"], story["title"]])
@@ -266,8 +292,15 @@ def _story_html(item: dict, story: dict, section_name: str, next_story: tuple[st
     )
     standfirst = f'<p class="standfirst">{_esc(summary)}</p>' if show_summary else ""
     body = _body_html(without_summary if show_summary else blocks)
+    background = _storyline_html(item.get("storyline")) + _background_html(item.get("background"))
 
     links = []
+    analysis = item.get("analysis")
+    if analysis:
+        links.append(
+            f'<p><b>Go deeper.</b> <a href="{_esc(_clean_url(analysis["url"]))}">{_esc(analysis["title"])}</a>'
+            f' ({_esc(analysis["source"])})</p>'
+        )
     if item.get("url"):
         links.append(f'<p><a href="{_esc(_clean_url(item["url"]))}">Read on {_esc(_domain(item["url"]))}</a></p>')
     if next_story:
@@ -281,6 +314,7 @@ def _story_html(item: dict, story: dict, section_name: str, next_story: tuple[st
         f'<p class="kicker">{_esc(story["kicker"])}</p>'
         f'<h1 class="headline">{_esc(story["title"])}</h1>'
         f"{standfirst}"
+        f"{background}"
         f'<div class="body">{body}</div>'
         f'<div class="endnav">{"".join(links)}</div>'
     )

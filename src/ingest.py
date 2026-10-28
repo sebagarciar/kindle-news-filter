@@ -47,6 +47,20 @@ WORLD_FEEDS: list[tuple[str, str]] = [
     ("Al Jazeera", "https://www.aljazeera.com/xml/rss/all.xml"),
 ]
 
+# Explainers and analysis. They never compete for a headline slot: background.py
+# matches the day's World stories to these as context. Carnegie's feed was
+# dead when this list was made (2026-10-28), and The Economist's articles are
+# paywalled, so neither is here.
+ANALYSIS_FEEDS: list[tuple[str, str]] = [
+    ("Vox", "https://www.vox.com/rss/index.xml"),
+    ("The Conversation", "https://theconversation.com/global/articles.atom"),
+    ("Foreign Policy", "https://foreignpolicy.com/feed/"),
+    ("Crisis Group", "https://www.crisisgroup.org/rss.xml"),
+    ("Project Syndicate", "https://www.project-syndicate.org/rss"),
+]
+# Analysis is weekly, not daily, so it gets a wider window than news.
+ANALYSIS_WINDOW = timedelta(days=7)
+
 AI_FEEDS: list[tuple[str, str]] = [
     ("OpenAI", "https://openai.com/news/rss.xml"),
     ("TechCrunch AI", "https://techcrunch.com/category/artificial-intelligence/feed/"),
@@ -96,7 +110,7 @@ def _normalise(entry, source: str, published_at: datetime | None) -> dict:
     }
 
 
-def fetch_feed(source: str, url: str) -> list[dict]:
+def fetch_feed(source: str, url: str, window: timedelta = RECENCY_WINDOW) -> list[dict]:
     """Fetch and normalise entries from one feed, dropping anything older
     than RECENCY_WINDOW. Entries with no parseable date are kept, since
     dropping them silently would be worse than an occasional undated item.
@@ -107,7 +121,7 @@ def fetch_feed(source: str, url: str) -> list[dict]:
     parsed = feedparser.parse(url)
     if parsed.bozo and not parsed.entries:
         raise RuntimeError(f"{source}: failed to parse feed ({parsed.bozo_exception})")
-    cutoff = datetime.now(tz=timezone.utc) - RECENCY_WINDOW
+    cutoff = datetime.now(tz=timezone.utc) - window
     recent = []
     for entry in parsed.entries:
         published_at = _published_at(entry)
@@ -145,3 +159,16 @@ def fetch_ai_candidates() -> tuple[list[dict], list[str]]:
     except Exception:
         failed.append(HN_FRONTPAGE_FEED[0])
     return candidates, failed
+
+
+def fetch_analysis() -> tuple[list[dict], list[str]]:
+    """Explainer and analysis pieces from the last week. Returns
+    (pieces, failed_source_names), same as fetch_category."""
+    pieces: list[dict] = []
+    failed: list[str] = []
+    for source, url in ANALYSIS_FEEDS:
+        try:
+            pieces.extend(fetch_feed(source, url, ANALYSIS_WINDOW))
+        except Exception:
+            failed.append(source)
+    return pieces, failed

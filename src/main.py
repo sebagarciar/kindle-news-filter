@@ -34,6 +34,7 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 import backlog
+import background
 import cluster
 import deliver
 import epub_builder
@@ -42,6 +43,7 @@ import ingest
 import preferences
 import read_later
 import rank
+import storylines
 import telegram_bot
 import text_utils
 import youtube
@@ -154,7 +156,9 @@ def _embed_read_later(queued: list[dict], failures: list[str]) -> list[dict]:
     return items
 
 
-def run() -> None:
+def run(dry_run: bool = False) -> None:
+    """dry_run builds the EPUB into output/ and does nothing else: it does not
+    read Telegram, send the email, or record anything in the backlog."""
     load_dotenv()
     state_dir = backlog.BACKLOG_PATH.parent
     state_dir.mkdir(parents=True, exist_ok=True)
@@ -168,7 +172,9 @@ def run() -> None:
     edition_date = datetime.now(tz=timezone.utc).astimezone().date().isoformat()
 
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if bot_token:
+    if dry_run:
+        pass
+    elif bot_token:
         try:
             telegram_bot.drain_inbox(bot_token)
         except Exception as e:
@@ -203,6 +209,23 @@ def run() -> None:
         "Read Later": _embed_read_later(read_later_queued, failures),
     }
 
+    try:
+        pieces, analysis_failed = ingest.fetch_analysis()
+        if analysis_failed:
+            failures.append(f"Analysis: {len(analysis_failed)} source(s) failed ({', '.join(analysis_failed)})")
+        background.match_analysis(sections["World"], pieces)
+    except Exception as e:
+        failures.append(f"Analysis: matching failed ({e})")
+    story_state: list[dict] | None = None
+    try:
+        story_state = storylines.load(edition_date)
+        storylines.annotate(sections["World"], story_state, edition_date)
+    except Exception as e:
+        story_state = None
+        failures.append(f"Storylines: failed ({e})")
+    background.add_background(sections["World"], failures, "World")
+    background.add_background(sections["AI"], failures, "AI")
+
     status_line = "; ".join(failures) if failures else None
     if failures:
         _log(f"Degraded run for {edition_date}: {status_line}")
@@ -214,9 +237,14 @@ def run() -> None:
 
     output_dir = state_dir.parent / "output"
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / f"edition-{edition_date}.epub"
+    output_path = output_dir / (f"edition-{edition_date}-dryrun.epub" if dry_run else f"edition-{edition_date}.epub")
     output_path.write_bytes(epub_bytes)
     _log(f"Saved local copy: {output_path}")
+
+    if dry_run:
+        _log(f"Dry run: not sent, not recorded. Status: {status_line}")
+        print(output_path)
+        return
 
     try:
         deliver.send_edition(epub_bytes, edition_date)
@@ -229,6 +257,8 @@ def run() -> None:
     # until it has been delivered, so a failed send or a same-day re-run
     # rebuilds the same Read Later section instead of an empty one.
     read_later.mark_delivered(read_later_queued, edition_date)
+    if story_state is not None:
+        storylines.save(story_state)
 
     # Updates get recorded too, so the next repeat check sees the latest summary.
     for entry in world_selected + ai_selected + chile_selected:
@@ -236,4 +266,6 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    import sys
+
+    run(dry_run="--dry-run" in sys.argv)

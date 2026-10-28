@@ -107,11 +107,22 @@ def _build_prompt(
     lang_name = _LANGUAGE_NAME[language]
     prefs_block = preferences if preferences else "(none set)"
     exclusions_block = _exclusions_instruction(exclusions)
+    region_rule = (
+        " Spread your picks across different regions of the world. Do not pick two "
+        "stories about the same country or conflict, unless fewer than "
+        f"{ITEMS_PER_CATEGORY} regions have anything worth reading."
+        if category == "World" else ""
+    )
     return f"""You are selecting and summarising the "{category}" section of a daily \
 Kindle news digest for one reader. Pick the {ITEMS_PER_CATEGORY} most important items \
 from the candidates below — importance, not recency, and not simply how \
 many sources covered something (that signal, where present, is already \
 reflected in source_count).
+
+Importance means lasting consequence. Prefer the story most likely to still \
+matter in a year (wars and ceasefires, elections, economies and trade, major \
+laws and court rulings, big shifts in technology) over a dramatic one-day event \
+with no lasting effect, and over scandal or celebrity.{region_rule}
 
 Reader's standing preferences (steer selection toward these, they are not \
 optional flavour text):
@@ -155,7 +166,7 @@ deserve a place."""
 
 
 def _call_model(prompt: str) -> list[dict]:
-    raw = llm.generate(prompt, json_mode=True)
+    raw = llm.generate(prompt, json_mode=True, heavy=True)
     parsed = json.loads(raw)
     return parsed["items"]
 

@@ -17,16 +17,17 @@ brief.
 
 Git repo `sebagarciar/kindle-news-filter` on GitHub, **public**. Commit to `main`.
 
-## Local models, no paid API
+## Models: Claude for the heavy calls, Ollama for the rest
 
-No cloud AI API and no API key. Ranking and summarizing run through Ollama by default,
-model set by `OLLAMA_MODEL` in `.env` (now qwen3.5; Llama 3.1 8B is uninstalled).
-
-Claude is allowed as an opt-in backend, decided by Seba on 2026-11-01: `LLM_BACKEND=claude`
-in `.env` runs the `claude -p` command on his own Claude login (`claude /login`), still no
-API key. Only the heavy calls would use it; everything else stays on Ollama. Default is
-Ollama. Not wired yet: `rank.py` does not pass `heavy=True`, so setting it changes nothing
-today. A first pass used the Anthropic API and was corrected: don't add a paid API or a key.
+No cloud AI API and no API key, ever. Changed by Seba on 2026-10-28: the ranking,
+summaries, Background boxes, analysis matching and storylines (`heavy=True` in
+`src/llm.py`) run through the `claude -p` tool on his own Claude login when
+`LLM_BACKEND=claude` is set in `.env`. Model: `CLAUDE_MODEL`, default `sonnet`.
+Everything else (Telegram sorting, topic bans, YouTube notes) stays on local
+Ollama, model set by `OLLAMA_MODEL` in `.env` (now qwen3.5; Llama 3.1 8B is
+uninstalled). `LLM_BACKEND=ollama` puts all of it back on Ollama. The login can
+expire: if runs fail with an authentication error, run `claude /login`.
+Don't add a call that needs an API key without asking first.
 
 ## Daily schedule: Claude desktop scheduled task
 
@@ -34,8 +35,8 @@ Decided by Seba, 2026-10-28. The task `kindle-news-daily` (Claude app, Scheduled
 runs `scripts/run_daily.sh` at 12, 14, 16, 17, 18 and 20:00 local time. The script exits
 at once if today's edition is already in `state/run.log`, so it sends once a day. It also
 starts Ollama if it is down and uses a lock so runs never overlap. The Mac must be awake
-and the Claude app open; a missed slot runs when the app next opens. Ranking and
-summaries stay on local Ollama: Claude only starts the script. The task lives in the
+and the Claude app open; a missed slot runs when the app next opens. The script
+itself calls `claude -p` for the heavy model calls (see above). The task lives in the
 Claude app (Scheduled section) and in `~/.claude/scheduled-tasks/kindle-news-daily/SKILL.md`,
 not in this repo. Nothing is in launchd or cron; the plist in `scripts/` is the unused
 alternative.
