@@ -178,7 +178,9 @@ decoded, and Guardian titles ending "latest updates" get the Live label.
 
 Scheduled: a Claude desktop task runs `scripts/run_daily.sh` six times a day
 (12, 14, 16, 17, 18, 20:00). The script skips if today's edition was already
-sent, so only the first successful slot sends.
+sent, so only the first successful slot sends. The task is stored by the Claude
+app (`~/.claude/scheduled-tasks/kindle-news-daily/`), not in this repo, and only
+fires while the app is open; a missed slot runs when the app next opens.
 
 ## Stack
 

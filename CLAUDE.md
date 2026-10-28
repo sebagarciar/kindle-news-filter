@@ -30,8 +30,10 @@ runs `scripts/run_daily.sh` at 12, 14, 16, 17, 18 and 20:00 local time. The scri
 at once if today's edition is already in `state/run.log`, so it sends once a day. It also
 starts Ollama if it is down and uses a lock so runs never overlap. The Mac must be awake
 and the Claude app open; a missed slot runs when the app next opens. Ranking and
-summaries stay on local Ollama: Claude only starts the script. The launchd plist in
-`scripts/` is the unused alternative.
+summaries stay on local Ollama: Claude only starts the script. The task lives in the
+Claude app (Scheduled section) and in `~/.claude/scheduled-tasks/kindle-news-daily/SKILL.md`,
+not in this repo. Nothing is in launchd or cron; the plist in `scripts/` is the unused
+alternative.
 
 ## JSON calls use `format: "json"`, not a schema
 
