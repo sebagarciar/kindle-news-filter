@@ -32,7 +32,9 @@ def generate(
     temperature, num_predict); timeout is per call, since a long-context
     summarization takes several times what a headline ranking call does.
     """
-    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False}
+    # think=False: reasoning models (qwen3.5) otherwise spend the whole budget thinking
+    # and return an empty "response".
+    payload = {"model": OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False}
     if json_mode:
         payload["format"] = "json"
     if options:
