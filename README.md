@@ -26,8 +26,8 @@ headlines, chosen for importance, not recency. Full spec in
    stories covered by more outlets as more important, since RSS carries no
    popularity signal on its own. Chile's source pool is too small for that
    to mean anything, so those headlines go straight to the model instead.
-3. **Select and summarize**: one local model call per category (Llama 3.1
-   8B via [Ollama](https://ollama.com), no API key, nothing leaves the
+3. **Select and summarize**: one local model call per category (Qwen 3.5
+   via [Ollama](https://ollama.com), no API key, nothing leaves the
    laptop) picks the top 3 and writes a 1-2 sentence summary each, in
    English for World/AI and Spanish for Chile. A 7-day backlog stops the
    same story from repeating unless it has genuinely developed, in which
@@ -190,7 +190,7 @@ LLM inference).
 
 ## Setup
 
-1. Install [Ollama](https://ollama.com) and pull a model: `ollama pull llama3.1:8b` (or point `OLLAMA_MODEL` in `.env` at any model you already have; `ollama list` shows what's pulled)
+1. Install [Ollama](https://ollama.com) and pull a model: `ollama pull qwen3.5` (or point `OLLAMA_MODEL` in `.env` at any model you already have; `ollama list` shows what's pulled)
 2. `python3 -m venv .venv && source .venv/bin/activate`
 3. `pip install -r requirements.txt`
 4. `cp .env.example .env` and fill in the values (bot token, SMTP creds, Kindle address)

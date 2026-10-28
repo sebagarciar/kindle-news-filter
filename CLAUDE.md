@@ -20,7 +20,7 @@ Git repo `sebagarciar/kindle-news-filter` on GitHub, **public**. Commit to `main
 ## Local only, no exceptions
 
 No cloud AI API, no key, ever. Ranking and summarizing run through Ollama, model set by
-`OLLAMA_MODEL` in `.env`. A first pass used the Anthropic API and was corrected to this , 
+`OLLAMA_MODEL` in `.env` (now qwen3.5; Llama 3.1 8B is uninstalled). A first pass used the Anthropic API and was corrected to this , 
 don't reintroduce a cloud call for "better quality" without asking first.
 
 ## Daily schedule: Claude desktop scheduled task
@@ -41,5 +41,6 @@ The ranking, topic-ban and Telegram calls ask Ollama for plain JSON and validate
 answer in code. Passing a full JSON schema instead was tested on 2026-09-23 with
 llama3.1:8b and made both main calls worse: the ranking repeated a story in 2 of 3
 runs, and forcing the ban topic to come from the ban list pushed the model's stray
-flags past the validator, dropping an unrelated story in 3 of 3 runs. Re-test before
-trying it again with a different model.
+flags past the validator, dropping an unrelated story in 3 of 3 runs. That test was on Llama, which is
+no longer installed. The code now runs on qwen3.5 (thinking turned off in `llm.py`),
+so the result is untested on it. Re-test before changing it.
