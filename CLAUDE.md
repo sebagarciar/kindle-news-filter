@@ -23,12 +23,15 @@ No cloud AI API, no key, ever. Ranking and summarizing run through Ollama, model
 `OLLAMA_MODEL` in `.env`. A first pass used the Anthropic API and was corrected to this , 
 don't reintroduce a cloud call for "better quality" without asking first.
 
-## Daily schedule: decided, not built yet
+## Daily schedule: Claude desktop scheduled task
 
-Seba approved the PRD's plan: run once a day via cron/launchd, afternoon Madrid time. This is
-his decision, so it is the one automation here that does not need asking about first. It is not
-wired up yet and the digest is still started by hand with `python src/main.py`. Don't assume it
-runs automatically.
+Decided by Seba, 2026-10-28. The task `kindle-news-daily` (Claude app, Scheduled section)
+runs `scripts/run_daily.sh` at 12, 14, 16, 17, 18 and 20:00 local time. The script exits
+at once if today's edition is already in `state/run.log`, so it sends once a day. It also
+starts Ollama if it is down and uses a lock so runs never overlap. The Mac must be awake
+and the Claude app open; a missed slot runs when the app next opens. Ranking and
+summaries stay on local Ollama: Claude only starts the script. The launchd plist in
+`scripts/` is the unused alternative.
 
 ## JSON calls use `format: "json"`, not a schema
 

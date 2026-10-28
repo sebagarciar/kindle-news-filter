@@ -176,8 +176,9 @@ word from the article stays in the body if it's hidden. Two smaller fixes
 from the same edition: feed titles with HTML codes ("&#8216;") are now
 decoded, and Guardian titles ending "latest updates" get the Live label.
 
-Not yet done: the daily cron job isn't scheduled, so this is still started
-by hand.
+Scheduled: a Claude desktop task runs `scripts/run_daily.sh` six times a day
+(12, 14, 16, 17, 18, 20:00). The script skips if today's edition was already
+sent, so only the first successful slot sends.
 
 ## Stack
 
@@ -205,7 +206,9 @@ local inference for a 40-minute video, since the transcript is read in
 chunks and then merged. Five queued videos is the worst case the
 per-edition cap allows, and that run takes most of half an hour.
 
-Intended to run once daily via cron/launchd, afternoon Madrid time (see PRD section 4).
+`scripts/run_daily.sh` is the safe entry point: it skips if today's edition is
+already sent, starts Ollama if needed, and refuses to overlap. The scheduled
+task calls it. Running `python src/main.py` by hand still always sends.
 
 ## State
 
