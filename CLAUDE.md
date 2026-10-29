@@ -32,7 +32,7 @@ Don't add a call that needs an API key without asking first.
 ## Daily schedule: Claude desktop scheduled task
 
 Decided by Seba, 2026-10-28. The task `kindle-news-daily` (Claude app, Scheduled section)
-runs `scripts/run_daily.sh` at 12, 14, 16, 17, 18 and 20:00 local time. The script exits
+runs `scripts/run_daily.sh` at 16, 17, 18 and 20:00 local time. The script exits
 at once if today's edition is already in `state/run.log`, so it sends once a day. It also
 starts Ollama if it is down and uses a lock so runs never overlap. The Mac must be awake
 and the Claude app open; a missed slot runs when the app next opens. The script
