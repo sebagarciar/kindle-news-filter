@@ -17,11 +17,16 @@ brief.
 
 Git repo `sebagarciar/kindle-news-filter` on GitHub, **public**. Commit to `main`.
 
-## Local only, no exceptions
+## Local models, no paid API
 
-No cloud AI API, no key, ever. Ranking and summarizing run through Ollama, model set by
-`OLLAMA_MODEL` in `.env` (now qwen3.5; Llama 3.1 8B is uninstalled). A first pass used the Anthropic API and was corrected to this , 
-don't reintroduce a cloud call for "better quality" without asking first.
+No cloud AI API and no API key. Ranking and summarizing run through Ollama by default,
+model set by `OLLAMA_MODEL` in `.env` (now qwen3.5; Llama 3.1 8B is uninstalled).
+
+Claude is allowed as an opt-in backend, decided by Seba on 2026-11-01: `LLM_BACKEND=claude`
+in `.env` runs the `claude -p` command on his own Claude login (`claude /login`), still no
+API key. Only the heavy calls would use it; everything else stays on Ollama. Default is
+Ollama. Not wired yet: `rank.py` does not pass `heavy=True`, so setting it changes nothing
+today. A first pass used the Anthropic API and was corrected: don't add a paid API or a key.
 
 ## Daily schedule: Claude desktop scheduled task
 

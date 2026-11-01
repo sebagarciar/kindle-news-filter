@@ -6,7 +6,9 @@ agreement, summarizes them with a local language model, and emails the
 result as an EPUB to my Kindle. A Telegram bot lets me queue articles
 (including X posts) from my phone for the same digest.
 
-No cloud AI API, no server, no database. Everything runs on my laptop.
+No paid AI API, no server, no database. Everything runs on my laptop. Models run
+locally through Ollama; Claude on my own login (`claude -p`, no API key) is an
+opt-in alternative via `LLM_BACKEND=claude`.
 
 ## Why
 
