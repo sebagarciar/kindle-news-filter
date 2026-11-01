@@ -18,7 +18,7 @@ headlines, chosen for importance, not recency. Full spec in
 
 1. **Ingest**: pull recent headlines from 4 World feeds (BBC, Guardian,
    NPR, Al Jazeera), 5 AI sources (OpenAI, TechCrunch, The Verge,
-   VentureBeat, Hacker News filtered by keyword), and 3 Chile feeds
+   Ars Technica, Hacker News filtered by keyword), and 3 Chile feeds
    (Cooperativa, BioBioChile, La Tercera). Capped per feed to keep any one
    high-frequency source from crowding out the rest, about 30-40 candidates
    per category.
@@ -71,7 +71,7 @@ topic which never name it — "no sport" has to remove "Real Madrid beats
 Barcelona", and no keyword list gets there. The model only labels which
 headlines are about a banned topic; the dropping is done in Python.
 
-## Status (as of 2026-09-05)
+## Status (as of 2026-10-28)
 
 Every stage has run against live data, not test fixtures: real RSS feeds,
 real cross-source clustering on the day's actual headlines, real ranking

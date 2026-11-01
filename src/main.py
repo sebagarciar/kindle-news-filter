@@ -1,6 +1,7 @@
 """Daily orchestrator. PRD 4, 5.10.
 
-Run once in the afternoon (Madrid time), manually or via cron/launchd:
+Run by hand, or by the Claude desktop scheduled task through
+scripts/run_daily.sh (which skips if today's edition was already sent):
 
   1. Drain the Telegram inbox (telegram_bot.py) -> update preferences/queue
   2. Ingest RSS candidates per category (ingest.py)

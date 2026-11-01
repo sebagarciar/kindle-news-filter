@@ -1,5 +1,10 @@
 # Scheduling the daily run (launchd)
 
+> **Not in use.** The daily run is a Claude desktop scheduled task that calls
+> `scripts/run_daily.sh` six times a day (see `CLAUDE.md`). This launchd setup is
+> the unused alternative, kept for reference. The reasoning in the last section
+> predates that decision.
+
 This has to be installed once, on this Mac, in a real Terminal — it can't
 be done from a cloud/remote session, since launchd and Ollama both live on
 this machine, not in the cloud.
