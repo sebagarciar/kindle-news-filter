@@ -91,7 +91,7 @@ h1, h2, p { margin: 0; }
 a { text-decoration: none; color: inherit; }
 /* Kindle justifies by default. Fine for article text, but it stretches
    short headline and label lines into wide gaps. */
-h1, h2, .story p, .kicker, .standfirst, .endnav p { text-align: left; }
+h1, h2, h2.sub, .story p, .kicker, .standfirst, .endnav p { text-align: left; }
 
 .masthead { margin-bottom: 0.8em; padding-bottom: 0.4em; border-bottom: 2px solid #000; }
 .masthead h1 { font-size: 1.6em; font-weight: bold; line-height: 1.15; }
@@ -106,6 +106,8 @@ h2.section { margin-top: 1.3em; padding-bottom: 0.15em; border-bottom: 1px solid
 
 .kicker { margin-bottom: 0.5em; font-size: 0.75em; color: #444;
   text-transform: uppercase; letter-spacing: 0.08em; }
+h2.sub { margin: 1.2em 0 0.4em 0; font-size: 1.15em; font-weight: bold; line-height: 1.2;
+  border-bottom: 1px solid #777; padding-bottom: 0.1em; page-break-after: avoid; }
 h1.headline { margin-bottom: 0.6em; font-size: 1.45em; font-weight: bold; line-height: 1.2; }
 .standfirst { margin-bottom: 1.1em; padding-left: 0.6em; border-left: 2px solid #000; font-style: italic; }
 .body p { text-indent: 1.2em; }
@@ -216,7 +218,10 @@ def _lead(blocks: list[str]) -> str:
     a site's one-line subhead isn't the whole opening."""
     lead, words = [], 0
     for block in blocks:
-        if _NOTE_RE.match(block):
+        if block.startswith("## "):
+            parts.append(f'<h2 class="sub">{_esc(block[3:])}</h2>')
+            first = True
+        elif _NOTE_RE.match(block):
             continue
         lead.append(block)
         words += len(block.split())
@@ -232,7 +237,10 @@ def _body_html(blocks: list[str]) -> str:
     first = True
     for block in blocks:
         content = _esc(block).replace("\n", "<br/>")
-        if _NOTE_RE.match(block):
+        if block.startswith("## "):
+            parts.append(f'<h2 class="sub">{_esc(block[3:])}</h2>')
+            first = True
+        elif _NOTE_RE.match(block):
             parts.append(f'<p class="note">{content}</p>')
         else:
             parts.append(f'<p class="first">{content}</p>' if first else f"<p>{content}</p>")

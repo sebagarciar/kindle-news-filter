@@ -12,12 +12,33 @@ against the whole edition in epub_builder.py).
 
 from __future__ import annotations
 
+import re
+
 import trafilatura
 
 import text_utils
 
 MIN_SUMMARY_CHARS = 200  # below this, a bare RSS excerpt can't "stand alone"
 TRUNCATE_CHARS = 8000
+
+
+SUBHEAD_MARK = "## "
+
+
+def _mark_subheadings(text: str, downloaded: str) -> str:
+    """Prefix the article's own subheadings with "## ".
+
+    trafilatura's plain text turns a subheading into a paragraph like any
+    other, so on the Kindle it looked like body text. Its markdown output
+    keeps the heading marks, so read the heading texts from there and tag
+    the matching lines. epub_builder.py renders the tagged lines as headings.
+    """
+    markdown = trafilatura.extract(downloaded, output_format="markdown") or ""
+    heads = {m.group(1).strip() for m in re.finditer(r"^#{1,6}\s+(.+)$", markdown, re.M)}
+    if not heads:
+        return text
+    blocks = [SUBHEAD_MARK + b if b in heads else b for b in text.split("\n\n")]
+    return "\n\n".join(blocks)
 
 
 def fetch_article_text(url: str, fallback_summary: str) -> dict:
@@ -36,6 +57,7 @@ def fetch_article_text(url: str, fallback_summary: str) -> dict:
                 # blank-line-separated paragraphs: left as single lines, a
                 # whole article reached the Kindle as one <p>.
                 text = text_utils.strip_boilerplate(text)
+                text = _mark_subheadings(text, downloaded)
 
     if text and text.strip():
         truncated = len(text) > TRUNCATE_CHARS
