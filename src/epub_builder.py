@@ -221,10 +221,7 @@ def _lead(blocks: list[str]) -> str:
     a site's one-line subhead isn't the whole opening."""
     lead, words = [], 0
     for block in blocks:
-        if block.startswith("## "):
-            parts.append(f'<h2 class="sub">{_esc(block[3:])}</h2>')
-            first = True
-        elif _NOTE_RE.match(block):
+        if block.startswith("## ") or _NOTE_RE.match(block):
             continue
         lead.append(block)
         words += len(block.split())
